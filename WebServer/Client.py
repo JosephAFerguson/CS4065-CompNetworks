@@ -56,6 +56,40 @@ class HTTPClient:
             self.clientSocket = None
             print("Connection closed")
 
+def buildJSON(type: str, action: str) -> dict:
+    """
+    Creates the JSON which will be sent to the server
+    @param type: str = The type of the request
+    @param action: str = The action to be performed on the server side
+    """
+    return {
+        "type": type,
+        "action": action
+    }
+
+def executeCommand(client: HTTPClient, command: str, *args) -> bool:
+    """
+    Executes the command from the CLI
+    @param client: HTTPClient = The client which is sending the requests
+    @param command: command = The name of the command to execute
+    @returns: bool = Whether the CLI should continue execution
+    """
+    # Join the message board
+    if command == "join":
+        client.connect()
+    # View the message board
+    elif command == "viewBoard":
+        message = buildJSON("clientRequest", "viewBoard")
+        client.send_post_request(PATH, message)
+    # Exit the command line interface
+    elif command == "exit":
+        client.close()
+        return False
+    else: # Command not in command list, print error
+        print("Invalid Command.")
+    return True
+
+
 SERVER_ADDRESS = "localhost" # The server to connect the client to
 SERVER_PORT = 6789 # The port the server is running on
 
@@ -67,15 +101,8 @@ if __name__ == "__main__":
     # Create client instance
     client = HTTPClient(TEST_DOMAIN, TEST_PORT)
 
-    # Connect to the server
-    client.connect()
-   
-    # Send a POST with JSON data
-    jsonData = {'test': 123, 'test2': 456}
-    client.send_post_request(PATH , jsonData)
-
-    # Send a GET
-    client.send_get_request(PATH)
-
-    # Close the connection
-    client.close()
+    running = True
+    # Loop which runs the command line interface
+    while(running):
+        command = input("Message Board> ")
+        running = executeCommand(client, command)
