@@ -1,6 +1,6 @@
 {
-  "type":  "", //'request' or 'notification'
-  "action"   :  "",//type of request, like 'join' 'leave' 'joingroup' 'makeMessage' 'newMessage'
-  //based on the type and action we would expect different header fields
+  "type":  "", //'clientRequest' 'notification' 'serverAffirm'
+  "action"   :  "",//type of request, 'join' 'leave' 'joingroup' 'leavegroup' 'makeMessage' 'newMessage'
+  //based on the type and action we would expect different header fields such as userID, timeStamp, ect.
   
 }
