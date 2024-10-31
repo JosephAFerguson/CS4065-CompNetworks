@@ -8,6 +8,9 @@ Notes: JavaFX needs to be downloaded from https://gluonhq.com/products/javafx/
 * join = Connect to server
 * exit = Close the connection to the server
 * viewBoard = View the last 2 messages that were posted
-Notes: the javax. package needs downloaded from https://gluonhq.com/products/javafx/ 
+
+
+## Notes: 
+the javax. package needs downloaded from https://gluonhq.com/products/javafx/ 
 the org.json package imported in Server.java needs the following:
           in settings.json in vscode or whatever ide, the lib/json.jar file needs referenced.
