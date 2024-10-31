@@ -14,3 +14,11 @@ Notes: JavaFX needs to be downloaded from https://gluonhq.com/products/javafx/
 the javax. package needs downloaded from https://gluonhq.com/products/javafx/ 
 the org.json package imported in Server.java needs the following:
           in settings.json in vscode or whatever ide, the lib/json.jar file needs referenced.
+
+## JSON Structure
+Client -> Server:
+{
+    "type": The type of the request. I.e. "clientRequest",
+    "action": The action to be performed on the server. I.e. "join", "viewBoard",
+    
+}
