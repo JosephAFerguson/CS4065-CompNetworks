@@ -117,13 +117,27 @@ final class JSONRequest implements Runnable
         JsonObject responseJson = Json.createObjectBuilder().build();
         String type = jsonObject.getString("type");
 
-        if ("clientRequest".equals(type)) {  // Use .equals() to compare strings
-            // Process join request
-            // Send confirmed response (acknowledgement)
-            responseJson = Json.createObjectBuilder(responseJson)
-                .add("type", "ServerAffirm")
-                .add("receivedData", jsonObject)
-                .build();
+        if ("clientRequest".equals(type)) // Use .equals() to compare strings
+        {  
+            String action = jsonObject.getString("action");
+            //and so on
+            if("join".equals(action))
+            {
+                String groupID = jsonObject.getString("groupID");
+                //try request 
+                responseJson = Json.createObjectBuilder(responseJson)
+                    .add("type", "ServerAffirm")
+                    .add("receivedData", jsonObject)
+                    .build();
+                
+            }
+            else
+            {
+                responseJson = Json.createObjectBuilder(responseJson)
+                    .add("type", "ServerAffirm")
+                    .add("receivedData", jsonObject)
+                    .build();
+            }
         } else {
             System.out.print(type);
             // If not a "join" type, deny the request
