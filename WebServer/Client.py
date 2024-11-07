@@ -1,3 +1,4 @@
+from ast import parse
 import socket
 import json
 import time
@@ -53,16 +54,16 @@ class HTTPClient:
             self.clientSocket = None
             print("Connection closed")
 
-def buildJSON(type: str, action: str) -> dict:
+def buildJSON(args) -> dict:
     """
     Creates the JSON which will be sent to the server
     @param type: str = The type of the request
     @param action: str = The action to be performed on the server side
     """
-    return {
-        "type": type,
-        "action": action
-    }
+    ret = {}
+    for i in range(0,len(args)-1, 2):
+        ret[args[i]] = args[i+1]
+    return ret
 
 def executeCommand(client: HTTPClient, command: str) -> bool:
     """
@@ -77,10 +78,10 @@ def executeCommand(client: HTTPClient, command: str) -> bool:
         client.connect()
         return True
     elif command == "join":
-        message = buildJSON("clientRequest", "join")#needs the args added
+        message = buildJSON(["type", "clientRequest", "action", "join", "groupID", parsedComms[1]])
         client.send_post_request("/", message)
     elif command == "viewBoard":
-        message = buildJSON("clientRequest", "viewBoard")
+        message = buildJSON(["type", "clientRequest", "action", "viewBoard"])
         client.send_post_request("/", message)
     elif command == "exit":
         client.close()
