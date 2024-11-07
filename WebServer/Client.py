@@ -2,28 +2,20 @@ import socket
 import json
 import time
 
-# Class which will act as the client
 class HTTPClient:
     def __init__(self, host="localhost", port=6789):
-        self.host = host # The host to connect to. Defaulted to localhost
-        self.port = port # The port on the server to connect to. Defaulted to 6789
-        self.clientSocket = None
-    
+        self.host = host
+        self.port = port
+        self.clientSocket = None  # Initialize the socket as None
+
     def connect(self):
         """Establishes a connection to the server"""
         self.clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.clientSocket.connect((self.host, self.port))
         print(f"Connected to {self.host} on port {self.port}")
 
-    def send_get_request(self, path="/"):
-        """Send an HTTP GET request."""
-        request = f"GET {path} HTTP/1.1\r\nHost: {self.host}\r\nConnection: keep-alive\r\n\r\n"
-        self.clientSocket.sendall(request.encode("utf-8"))
-        print(f"GET request sent to {path}")
-
     def send_post_request(self, path, data):
         """Send an HTTP POST request with JSON"""
-        # Encoding data as JSON
         jsonData = json.dumps(data)
         contentLength = len(jsonData)
 
@@ -42,13 +34,18 @@ class HTTPClient:
     def receive_response(self):
         """Receive the server's response."""
         response = b""
+        self.clientSocket.settimeout(10)  # Timeout after 10 seconds
         while True:
-            data = self.clientSocket.recv(4096)
-            if not data:
+            try:
+                data = self.clientSocket.recv(4096)  # Receive in chunks
+                if not data:
+                    break
+                response += data
+            except socket.timeout:
+                print("Timeout reached while receiving data.")
                 break
-            response += data
         return response.decode("utf-8")
-    
+
     def close(self):
         """Close the connection"""
         if self.clientSocket:
@@ -67,42 +64,43 @@ def buildJSON(type: str, action: str) -> dict:
         "action": action
     }
 
-def executeCommand(client: HTTPClient, command: str, *args) -> bool:
+def executeCommand(client: HTTPClient, command: str) -> bool:
     """
     Executes the command from the CLI
     @param client: HTTPClient = The client which is sending the requests
     @param command: command = The name of the command to execute
     @returns: bool = Whether the CLI should continue execution
     """
-    # Join the message board
-    if command == "join":
+    parsedComms = command.split(" ")
+    command = parsedComms[0]
+    if command == "connect":
         client.connect()
-    # View the message board
+        return True
+    elif command == "join":
+        message = buildJSON("clientRequest", "join")#needs the args added
+        client.send_post_request("/", message)
     elif command == "viewBoard":
         message = buildJSON("clientRequest", "viewBoard")
-        client.send_post_request(PATH, message)
-    # Exit the command line interface
+        client.send_post_request("/", message)
     elif command == "exit":
         client.close()
-        return False
-    else: # Command not in command list, print error
+        return True
+    else:
         print("Invalid Command.")
+    
+    # Receive Response
+    response = client.receive_response()
+    print(f"Response received: {response}")
     return True
 
 
-SERVER_ADDRESS = "localhost" # The server to connect the client to
-SERVER_PORT = 6789 # The port the server is running on
+SERVER_ADDRESS = "localhost"
+SERVER_PORT = 6789
 
 if __name__ == "__main__":
-    TEST_DOMAIN = "webhook.site"
-    TEST_PORT = 80
-    PATH = "/"
-
-    # Create client instance
-    client = HTTPClient(TEST_DOMAIN, TEST_PORT)
+    client = HTTPClient()
 
     running = True
-    # Loop which runs the command line interface
-    while(running):
+    while running:
         command = input("Message Board> ")
         running = executeCommand(client, command)
