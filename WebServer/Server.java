@@ -1,5 +1,8 @@
-package ProgAssign2.WebServer;
-import javax.json.*;
+package com.example;
+
+import javax.json.JsonObject;
+import javax.json.JsonReader;
+import javax.json.Json;
 import java.io.*;
 import java.net.*;
 
@@ -63,14 +66,9 @@ final class JSONRequest implements Runnable
         String requestLine = in.readLine();
         System.out.println("Request: " + requestLine);
 
-        // Determine if it's a GET or POST request
         if (requestLine.startsWith("POST")) 
         {
             handlePostRequest(in, out);
-        } 
-        else if (requestLine.startsWith("GET")) 
-        {
-            handleGetRequest(out);
         } 
         else 
         {
@@ -110,38 +108,40 @@ final class JSONRequest implements Runnable
             System.out.println("Received JSON: " + jsonObject.toString());
         }
 
-        // Create a response JSON object
-        JsonObject responseJson = Json.createObjectBuilder()
-                .add("status", "success")
-                .add("message", "POST request received")
-                .add("receivedData", jsonObject)
-                .build();
-
-        // Send response
-        sendJsonResponse(out, responseJson);
-    }
-
-    private void handleGetRequest(BufferedWriter out) throws IOException 
-    {
-        // Create a response JSON object for GET requests
-        JsonObject responseJson = Json.createObjectBuilder()
-                .add("status", "success")
-                .add("message", "GET request received")
-                .build();
-
-        // Send response
-        sendJsonResponse(out, responseJson);
+        // Send Response(s) JSON(s)
+        sendJsonResponse(out, jsonObject);  
     }
 
     private void sendJsonResponse(BufferedWriter out, JsonObject jsonObject) throws IOException 
     {
-        String jsonResponse = jsonObject.toString();
+        JsonObject responseJson = Json.createObjectBuilder().build();
+        String type = jsonObject.getString("type");
+
+        if ("clientRequest".equals(type)) {  // Use .equals() to compare strings
+            // Process join request
+            // Send confirmed response (acknowledgement)
+            responseJson = Json.createObjectBuilder(responseJson)
+                .add("type", "ServerAffirm")
+                .add("receivedData", jsonObject)
+                .build();
+        } else {
+            System.out.print(type);
+            // If not a "join" type, deny the request
+            responseJson = Json.createObjectBuilder(responseJson)
+                .add("type", "ServerDeny")
+                .add("receivedData", jsonObject)
+                .build();
+        }
+
+        // Convert the response JSON to string and send it
+        String jsonResponse = responseJson.toString();
         out.write("HTTP/1.1 200 OK\r\n");
         out.write("Content-Type: application/json\r\n");
         out.write("Content-Length: " + jsonResponse.length() + "\r\n");
         out.write("\r\n");
         out.write(jsonResponse);
         out.flush();
+        System.out.println("Sent response: " + jsonResponse);
     }
 
     private void sendNotFound(BufferedWriter out) throws IOException 
