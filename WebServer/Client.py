@@ -78,7 +78,7 @@ def executeCommand(client: HTTPClient, command: str) -> bool:
         client.connect()
         return True
     elif command == "join":
-        message = buildJSON(["type", "clientRequest", "action", "join", "groupID", parsedComms[1]])
+        message = buildJSON(["type", "clientRequest", "action", "join"])
         client.send_post_request("/", message)
     elif command == "viewBoard":
         message = buildJSON(["type", "clientRequest", "action", "viewBoard"])
