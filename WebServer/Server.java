@@ -3,6 +3,7 @@ package com.example;
 import javax.json.JsonObject;
 import javax.json.JsonReader;
 import javax.json.Json;
+import java.util.HashMap;
 import java.io.*;
 import java.net.*;
 
@@ -32,6 +33,43 @@ public final class Server
             thread.start();
         }
     }
+}
+final class Message{
+    int messageID;
+    String sender;
+    String postDate;
+    String subject;
+    String content;
+}
+final class MessageBoard{
+    private HashMap<Integer, Message> messages; // Store messages by ID
+    private Message[] messagesByDate;
+    private int ind;
+
+
+    public MessageBoard() {
+        messages = new HashMap<>();
+        messagesByDate = new Message[100];
+        ind = 0;
+    }
+
+    public void addMessage(int id, Message message) {
+        messages.put(id, message);
+        messagesByDate[ind] = message;
+        ind++;
+    }
+
+    public Message getMessage(int id) {
+        return messages.get(id);
+    }
+
+    //this might not be needed
+    public void deleteMessage(int id) {
+        messages.remove(id);
+        //here we need to traverse through Messages by date
+    }
+
+    // Additional methods for managing users, etc.
 }
 
 final class JSONRequest implements Runnable 
@@ -123,15 +161,13 @@ final class JSONRequest implements Runnable
             //and so on
             if("join".equals(action))
             {
-                String groupID = jsonObject.getString("groupID");
-                //try request 
+                //try request-  add user to public message board 
                 responseJson = Json.createObjectBuilder(responseJson)
                     .add("type", "ServerAffirm")
                     .add("receivedData", jsonObject)
                     .build();
-                
             }
-            else
+            else//handle others
             {
                 responseJson = Json.createObjectBuilder(responseJson)
                     .add("type", "ServerAffirm")
