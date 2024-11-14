@@ -1,6 +1,7 @@
 from ast import parse
 import socket
 import json
+import threading
 import time
 
 class HTTPClient:
@@ -73,45 +74,91 @@ def buildJSON(args) -> dict:
         ret[args[i]] = args[i+1]
     return ret
 
+def listenForMessages(client: HTTPClient) -> None:
+    """
+    Listens for messages from the server and when it catches them it will
+    output them based on the message
+    @param client: HTTPClient = The client which is receiving the messages
+    @returns: None
+    """
+    global mbActive
+    while True:
+        # Receive Response
+        response = client.receive_response()
+        with mbLock:
+            splitResponse = response.split("\r\n\r\n")
+            if len(splitResponse) > 1:
+                body = splitResponse[1]
+                responseJSON = json.loads(body)
+            else:
+                print("ERROR: No body in response from server")
+                return True
+            # ServerAffirm is returned when action is successful
+            if (responseJSON['type'] == "ServerAffirm"):
+                print(f"Action {responseJSON['receivedData']['action']} was performed successfully.")
+            else:
+                print(f"ERROR: Action {responseJSON['receivedData']['action']} returned error {responseJSON['error']}.")
+            mbActive = True
+            #time.sleep(0.5) # Waiting half a second so it doesn't run on an empty body
+
 def executeCommand(client: HTTPClient, command: str) -> bool:
     """
     Executes the command from the CLI
-    @param client: HTTPClient = The client which is sending the requestscon
+    @param client: HTTPClient = The client which is sending the requests
     @param command: command = The name of the command to execute
     @returns: bool = Whether the CLI should continue execution
     """
+    global mbActive
     parsedComms = command.split(" ")
     command = parsedComms[0]
     if command == "connect":
         client.connect()
+        listeningThread.start() # If the client is connected, start listening
+        mbActive = True
+        return True
     elif command == "join":
         if (len(parsedComms)==2):
             message = buildJSON(["type", "clientRequest", "action", "join", "username", parsedComms[1]])
         else:
             message = buildJSON(["type", "clientRequest", "action", "join"])
         client.send_post_request("/users", message)
-    elif command == "viewBoard":
-        message = buildJSON(["type", "clientRequest", "action", "viewBoard"])
-        client.send_post_request("/users", message)
+    elif command == "post":
+        if (len(parsedComms) == 3):
+            messageSubject = parsedComms[1]
+            messageContent = parsedComms[2]
+            message = buildJSON(["type", "clientRequest", "action", "postMessage", "messageSubject", messageSubject, "messageContent", messageContent])
+            client.send_post_request("/users", message)
+        else:
+            print("ERROR: You must submit the subject and the content for the message to be sent.")
     elif command == "exit":
         client.close()
         return False
     else:
         print("Invalid Command.")
-    
-    # Receive Response
-    response = client.receive_response()
-    print(f"Response received: {response}")
+
+    # The message back from the server is handled on the listening thread
+    # Need to disable message board while waiting for response from server
+    mbActive = False
     return True
 
 
 SERVER_ADDRESS = "localhost"
 SERVER_PORT = 6789
 
+mbLock = threading.Lock() # The lock which controls whether reading from messaging board or outputting messages from server
+mbActive = True # This is True if message board good to go. False if need to wait until server message read 
+
 if __name__ == "__main__":
     client = HTTPClient()
 
+    # Creating the listening thread
+    listeningThread = threading.Thread(target=listenForMessages, args=[client])
+    listeningThread.daemon = True # Exit thread when main program exits
+
+    # Main loop for the message board
     running = True
     while running:
-        command = input("Message Board> ")
-        running = executeCommand(client, command)
+        if mbActive:
+            with mbLock:
+                command = input("Message Board> ")
+                running = executeCommand(client, command)
