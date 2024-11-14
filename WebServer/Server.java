@@ -62,10 +62,10 @@ final class MessageBoard {
         userInd = 0;
         messageInd = 0;
     }
-    public int getMessageID(){
+    public synchronized int getMessageID(){
         return messageInd;
     }
-    public boolean getUser(String username) {
+    public synchronized boolean getUser(String username) {
         for (int i = 0; i < userInd; i++) {
             if (users[i].equals(username)) {
                 return true;
@@ -74,11 +74,11 @@ final class MessageBoard {
         return false;
     }
 
-    public String[] getAllUsers() {
+    public synchronized String[] getAllUsers() {
         return users;
     }
 
-    public void addUser(String username) {
+    public synchronized void addUser(String username) {
         if (userInd < CONSTANTS.MAX_USERS) {
             users[userInd] = username;
             userInd++;
@@ -87,7 +87,7 @@ final class MessageBoard {
         }
     }
 
-    public void removeUser(String username) {
+    public synchronized void removeUser(String username) {
         for (int i = 0; i < userInd; i++) {
             if (users[i].equals(username)) {
                 // Shift elements to the left
@@ -101,7 +101,7 @@ final class MessageBoard {
         }
     }
 
-    public void addMessage(int id, Message message) {
+    public synchronized void addMessage(int id, Message message) {
 
         if (messageInd < CONSTANTS.MAX_MESSAGES) {
             messages.put(id, message);
@@ -112,7 +112,7 @@ final class MessageBoard {
         }
     }
 
-    public Message[] getLast2() {
+    public synchronized Message[] getLast2() {
         Message[] retMessages = new Message[2];
         if (messageInd >= 2) {
             retMessages[0] = messagesByDate[messageInd - 1];
@@ -126,11 +126,11 @@ final class MessageBoard {
         return retMessages;
     }
 
-    public Message getMessage(int id) {
+    public synchronized Message getMessage(int id) {
         return messages.get(id);
     }
 
-    public void deleteMessage(int id) {
+    public synchronized void deleteMessage(int id) {
         if (!messages.containsKey(id)) {
             System.out.println("Message ID not found.");
             return;
@@ -152,11 +152,13 @@ final class MessageBoard {
 final class JSONRequest implements Runnable {
     private Socket socket;
     private MessageBoard messageBoard;
+    private String user;
 
     // Constructor
     public JSONRequest(Socket socket, MessageBoard messageBoard) {
         this.socket = socket;
         this.messageBoard = messageBoard;
+        this.user = null;
     }
 
     // Implement the run() method of the Runnable interface
@@ -320,6 +322,7 @@ final class JSONRequest implements Runnable {
                 // Otherwise, throw an error
                 if (!messageBoard.getUser(username)) {
                     messageBoard.addUser(username);
+                    this.user = username;
                     responseJson = Json.createObjectBuilder()
                             .add("type", "ServerAffirm")
                             .add("receivedData", jsonObject)
@@ -332,20 +335,24 @@ final class JSONRequest implements Runnable {
             } 
             else if ("postMessage".equals(action)) //Handles post Message request
             {
-                if (!jsonObject.containsKey("username") || !jsonObject.containsKey("messageContent") || !jsonObject.containsKey("messageSubject")) {
+                if (!jsonObject.containsKey("messageContent") || !jsonObject.containsKey("messageSubject")) {
                     String errorMessage = "In order to perform join command, you must include key 'username', key 'messageContent', key 'messageSubject' in request";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
                     return;
                 }
                 System.out.println("Performing join operation.");
 
-                String username = jsonObject.getString("username");
                 String messageContent = jsonObject.getString("messageContent");
                 String messageSubject = jsonObject.getString("messageSubject");
 
-                if(!messageBoard.getUser(username))
-                {
+                if (this.user == null){
                     String errorMessage = "To post a message the user must be in the public group, try performing the join first";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+                if(!messageBoard.getUser(this.user))
+                {
+                    String errorMessage = "This user is not in the public group";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
                     return;
                 }
@@ -356,7 +363,7 @@ final class JSONRequest implements Runnable {
                 message.subject = messageSubject;
                 message.messageID = messageID;
                 message.postDate = LocalDate.now().toString();
-                message.sender = username;
+                message.sender = this.user;
 
                 messageBoard.addMessage(messageID, message);
                 responseJson = Json.createObjectBuilder()
