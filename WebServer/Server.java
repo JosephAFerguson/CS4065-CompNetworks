@@ -5,6 +5,7 @@ import javax.json.JsonReader;
 //import javax.swing.*;//to be used for our later gui if added
 import javax.json.Json;
 import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.io.*;
 import java.time.LocalDate;
 import java.net.*;
@@ -15,7 +16,9 @@ final class CONSTANTS {
 }
 
 public final class Server {
+    private static ConcurrentHashMap<String, Socket> activeUsers = new ConcurrentHashMap<>();
     public static void main(String[] argv) throws Exception {
+
         MessageBoard messageBoard = new MessageBoard();
         int port = 6789;
 
@@ -37,6 +40,9 @@ public final class Server {
             // Start the thread
             thread.start();
         }
+    }
+    public static ConcurrentHashMap<String, Socket> getActiveUsers(){
+        return activeUsers;
     }
 }
 
@@ -125,7 +131,9 @@ final class MessageBoard {
         }
         return retMessages;
     }
-
+    public synchronized boolean tryMessageID(int id) {
+        return messages.containsKey(id);
+    }
     public synchronized Message getMessage(int id) {
         return messages.get(id);
     }
@@ -169,10 +177,29 @@ final class JSONRequest implements Runnable {
             e.printStackTrace();
         }
     }
-
+    private void notifyAllUsers(String notificationMessage) {
+        for (Socket clientSocket : Server.getActiveUsers().values()) {
+            try {
+                BufferedWriter clientOut = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
+                JsonObject notificationJson = Json.createObjectBuilder()
+                        .add("type", "serverNotification")
+                        .add("data", notificationMessage)
+                        .build();
+    
+                clientOut.write("HTTP/1.1 200 OK\r\n");
+                clientOut.write("Content-Type: application/json\r\n");
+                clientOut.write("Content-Length: " + notificationJson.toString().length() + "\r\n");
+                clientOut.write("\r\n");
+                clientOut.write(notificationJson.toString());
+                clientOut.flush();
+            } catch (IOException e) {
+                System.out.println("Error notifying users: " + e.getMessage());
+            }
+        }
+    }    
     private void processRequest() {
         try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()))) {
+            BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()))) {
 
             // Read the request line
             String requestLine = in.readLine();
@@ -186,15 +213,19 @@ final class JSONRequest implements Runnable {
 
         } catch (IOException e) {
             System.err.println("Error processing request: " + e.getMessage());
+        } finally {
+            // Handle user disconnection
+            if (this.user != null) {
+                Server.getActiveUsers().remove(this.user);
+                System.out.println(this.user + " has disconnected.");
+                notifyAllUsers(this.user + " has left the chat.");
+            }
+            try {
+                socket.close();
+            } catch (IOException e) {
+                System.err.println("Error closing socket: " + e.getMessage());
+            }
         }
-        // finally {
-        // try {
-        // System.out.println("Attempting to close socket.");
-        // socket.close();
-        // } catch (IOException e) {
-        // System.err.println("Error closing socket: " + e.getMessage());
-        // }
-        // }
     }
 
     private void handlePostRequest(BufferedReader in, BufferedWriter out) throws IOException {
@@ -323,6 +354,10 @@ final class JSONRequest implements Runnable {
                 if (!messageBoard.getUser(username)) {
                     messageBoard.addUser(username);
                     this.user = username;
+
+                    //Register the socket in the active users map
+                    Server.getActiveUsers().put(username, socket);
+
                     responseJson = Json.createObjectBuilder()
                             .add("type", "ServerAffirm")
                             .add("receivedData", jsonObject)
@@ -332,6 +367,9 @@ final class JSONRequest implements Runnable {
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
                     return;
                 }
+                /* Here we need to add functionality to notify all other users of the new user
+                We also need to  show the new user to that 2 latest messages*/ 
+                notifyAllUsers(this.user + " has entered the message board");
             } 
             else if ("postMessage".equals(action)) //Handles post Message request
             {
@@ -370,7 +408,35 @@ final class JSONRequest implements Runnable {
                             .add("type", "ServerAffirm")
                             .add("receivedData", jsonObject)
                             .build();
+                /*Here we need to add a functionality to notify all other users of the new message */
 
+            } else if ("getMessage".equals(action))//handles a get Message with message ID request
+            {
+                if (this.user == null){
+                    String errorMessage = "To get a message the user must be in the public group, try performing the join first";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+                if (!jsonObject.containsKey("messageID")) {
+                    String errorMessage = "In order to get a message the key 'messageID' must be included in the request";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+                int messageID = jsonObject.getInt("messageID");
+                Message message;
+                if(messageBoard.tryMessageID(messageID)){
+                    message = messageBoard.getMessage(messageID);
+                }
+                else{
+                    String errorMessage = "Message ID does not exist in this message board";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+                responseJson = Json.createObjectBuilder()
+                        .add("type", "ServerAffirm")
+                        .add("messageContent", message.content)
+                        .add("receivedData", jsonObject)
+                        .build();
             } else {
                 // Handles the situation in which the action is invalid
                 // The action should match one of the possible actions for the client
