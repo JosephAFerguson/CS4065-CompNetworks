@@ -32,7 +32,7 @@ class HTTPClient:
             f"Host: {self.host}\r\n"
             "Content-Type: application/json\r\n"
             f"Content-Length: {contentLength}\r\n"
-            "Connection: close\r\n\r\n"  # Set connection to close
+            "Connection: keep-alive\r\n\r\n"  # Set connection to keep-alive so the connection persists
             f"{jsonData}"
         )
         self.clientSocket.sendall(request.encode("utf-8"))
@@ -84,19 +84,18 @@ def executeCommand(client: HTTPClient, command: str) -> bool:
     command = parsedComms[0]
     if command == "connect":
         client.connect()
-        return True
     elif command == "join":
         if (len(parsedComms)==2):
             message = buildJSON(["type", "clientRequest", "action", "join", "username", parsedComms[1]])
         else:
             message = buildJSON(["type", "clientRequest", "action", "join"])
-        client.send_post_request("/", message)
+        client.send_post_request("/users", message)
     elif command == "viewBoard":
         message = buildJSON(["type", "clientRequest", "action", "viewBoard"])
-        client.send_post_request("/", message)
+        client.send_post_request("/users", message)
     elif command == "exit":
         client.close()
-        return True
+        return False
     else:
         print("Invalid Command.")
     
