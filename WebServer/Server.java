@@ -6,6 +6,7 @@ import javax.json.JsonReader;
 import javax.json.Json;
 import java.util.HashMap;
 import java.io.*;
+import java.time.LocalDate;
 import java.net.*;
 
 final class CONSTANTS {
@@ -61,7 +62,9 @@ final class MessageBoard {
         userInd = 0;
         messageInd = 0;
     }
-
+    public int getMessageID(){
+        return messageInd;
+    }
     public boolean getUser(String username) {
         for (int i = 0; i < userInd; i++) {
             if (users[i].equals(username)) {
@@ -245,7 +248,7 @@ final class JSONRequest implements Runnable {
         out.write("Content-Type: application/json\r\n");
         out.write("Content-Length: " + jsonResponse.length() + "\r\n");
         out.write("Connection: keep-alive\r\n\r\n");
-        out.write("\r\n");
+        //out.write("\r\n");
         out.write(jsonResponse);
         out.flush();
         System.out.println("Sent response: " + jsonResponse);
@@ -326,6 +329,41 @@ final class JSONRequest implements Runnable {
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
                     return;
                 }
+            } 
+            else if ("postMessage".equals(action)) //Handles post Message request
+            {
+                if (!jsonObject.containsKey("username") || !jsonObject.containsKey("messageContent") || !jsonObject.containsKey("messageSubject")) {
+                    String errorMessage = "In order to perform join command, you must include key 'username', key 'messageContent', key 'messageSubject' in request";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+                System.out.println("Performing join operation.");
+
+                String username = jsonObject.getString("username");
+                String messageContent = jsonObject.getString("messageContent");
+                String messageSubject = jsonObject.getString("messageSubject");
+
+                if(!messageBoard.getUser(username))
+                {
+                    String errorMessage = "To post a message the user must be in the public group, try performing the join first";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+
+                int messageID = messageBoard.getMessageID();
+                Message message = new Message();
+                message.content = messageContent;
+                message.subject = messageSubject;
+                message.messageID = messageID;
+                message.postDate = LocalDate.now().toString();
+                message.sender = username;
+
+                messageBoard.addMessage(messageID, message);
+                responseJson = Json.createObjectBuilder()
+                            .add("type", "ServerAffirm")
+                            .add("receivedData", jsonObject)
+                            .build();
+
             } else {
                 // Handles the situation in which the action is invalid
                 // The action should match one of the possible actions for the client
