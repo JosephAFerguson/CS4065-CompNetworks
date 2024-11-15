@@ -9,6 +9,7 @@ Instructor: Giovani Abuaitah
 * viewBoard = View the last 2 messages that were posted
 
 ## Notes: 
+pip install keepalive-socket
 ""the javax. package needs downloaded from https://gluonhq.com/products/javafx/ "" -This may not be needed anymore
 We used vscode as the editor for this. The extension pack: "Extension Pack for Java v0.29.0" needs installed in vscode.
 In the same directory as the client.py file, create a maven project, it will ask for 2 things and provide default values, just hit enter for each of the default values.
