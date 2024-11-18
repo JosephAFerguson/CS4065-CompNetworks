@@ -1,7 +1,7 @@
-People Currently Working on This = 0 //increment and add file to be worked on
 
 Things to Add/Change:
-  Debugging output for most of the send/receive html data
-  Actual console output for client message board user interactivity
+  Debugging output for most client file
+  Better console output for client message board user interactivity
+  Gui / seperation of user input and messages from server
 
-  Persistent/keep-alive connection seems to be failing, client can only send 1 request 
+  Part 2 implementation and some of the missed stuff from part 1
