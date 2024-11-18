@@ -1,3 +1,4 @@
+from ast import parse
 import socket
 import json
 import threading
@@ -76,11 +77,10 @@ def listenForMessages(client: HTTPClient) -> None:
 
 
 
-def executeCommand(client: HTTPClient, command: str) -> bool:
+def executeCommand(client: HTTPClient, command: str):
     """
     Executes the command from the CLI
     """
-    global mbActive
     parsedComms = command.split(" ")
     command = parsedComms[0]
     if command == "connect":
@@ -111,7 +111,30 @@ def executeCommand(client: HTTPClient, command: str) -> bool:
             print("ERROR: You must submit the subject and the content for the message to be sent.")
         print(client.receive_response())
         return True
+    elif command == "leave":
+        if (len(parsedComms))!=1:
+            print("ERROR: Leave command does not take any arguments")
+            return True
+        message = buildJSON(["type", "clientRequest", "action", "leave"])
+        client.clientSocket.sendall((json.dumps(message)+ "\n").encode("utf-8"))
+        return True
+    elif command == "message":
+        if (len(parsedComms)!=2):
+            print("ERROR: message command takes 1 parameter only: messageID")
+            return True
+        message = buildJSON(["type", "clientRequest", "action", "getMessage", "messageID",int(parsedComms[1])])
+        client.clientSocket.sendall((json.dumps(message)+ "\n").encode("utf-8"))
+        return True
+    elif command == "users":
+        #retrieve list of users
+        message = buildJSON(["type", "clientRequest", "action", "getUsers"])
+        client.clientSocket.sendall((json.dumps(message)+ "\n").encode("utf-8"))
+        return True
     elif command == "exit":
+        #need to perform a %leave if not already done to clean the connection up
+        message = buildJSON(["type", "clientRequest", "action", "leave"])
+        client.clientSocket.sendall((json.dumps(message)+ "\n").encode("utf-8"))
+        #close connection and return false as we are no longer running
         client.close()
         return False
     else:
@@ -121,9 +144,6 @@ def executeCommand(client: HTTPClient, command: str) -> bool:
 
 SERVER_ADDRESS = "localhost"
 SERVER_PORT = 6789
-
-mbLock = threading.Lock()  # The lock which controls whether reading from messaging board or outputting messages from server
-mbActive = True  # This is True if message board good to go. False if need to wait until server message read
 
 if __name__ == "__main__":
     client = HTTPClient()
