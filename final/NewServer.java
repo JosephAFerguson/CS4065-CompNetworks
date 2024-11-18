@@ -1,8 +1,6 @@
 package com.example;
-import javax.json.JsonObject;
-import javax.json.JsonReader;
-import javax.json.Json;
-import javax.json.JsonException;
+import javax.json.*;
+
 import java.util.HashMap;
 import java.util.concurrent.*;
 import java.util.logging.*;
@@ -48,7 +46,6 @@ final class MessageBoard {
         }
         return false;
     }
-
     public synchronized String[] getAllUsers() {
         return users;
     }
@@ -351,7 +348,33 @@ class TaskThread implements Runnable {
                 /* Here we need to add functionality to notify all other users of the new user
                 We also need to  show the new user to that 2 latest messages*/ 
                 notifyAllUsers(username + " has entered the message board");
-            } 
+            } else if ("leave".equals(action)) {
+
+                if(username == null){ //handle a user trying to leave when they aren't in the group anyway
+                    logger.info("This client is not in the message group: Leave Operation invalid");
+                    String errorMessage = "In order to perform leave command, user must first be in message Board";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+                //Handles the client leave public group functionality
+                logger.info("Performing Leave Operation for user:" + username);
+
+                //Construct message for client
+                responseJson = Json.createObjectBuilder()
+                        .add("type", "ServerAffirm")
+                        .add("receivedData", jsonObject)
+                        .build();
+                
+                //Send response
+                sendJsonResponse(out,  jsonObject);
+
+                //Notify all users //This needs to be done before we remove the user 
+                notifyAllUsers(username + " has left the message board");
+
+                //Remove the user from the message board and nullify the socket's username profile
+                messageBoard.removeUser(username);
+                User.setUsername(null);
+            }
             else if ("postMessage".equals(action)) //Handles post Message request
             {
                 if (!jsonObject.containsKey("messageContent") || !jsonObject.containsKey("messageSubject")) {
@@ -411,6 +434,33 @@ class TaskThread implements Runnable {
                         .add("messageContent", message.content)
                         .add("receivedData", jsonObject)
                         .build();
+            } else if ("getUsers".equals(action)){
+                if (username == null){
+                    String errorMessage = "To get a list of users the user must be in the public group, try performing the join first";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+                String[] users = messageBoard.getAllUsers();
+                JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();
+
+                // Add each user to the JSON array
+                for (String user : users) {
+                    if (user==null){
+                        break;
+                    }
+                    arrayBuilder.add(user);
+                }
+
+                // Build the response JSON object
+                responseJson = Json.createObjectBuilder()
+                        .add("type", "ServerAffirm")
+                        .add("data", arrayBuilder)
+                        .add("receivedData", jsonObject)
+                        .build();
+                sendJsonResponse(out, responseJson);
+                return;
+
+
             } else {
                 // Handles the situation in which the action is invalid
                 // The action should match one of the possible actions for the client
