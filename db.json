@@ -1,0 +1,11 @@
+{
+  "messages": [],
+  "users": [
+    {
+      "id": "22a5",
+      "type": "clientRequest",
+      "action": "join",
+      "username": "elirindler"
+    }
+  ]
+}
