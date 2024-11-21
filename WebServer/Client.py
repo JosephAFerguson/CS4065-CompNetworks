@@ -1,18 +1,58 @@
-from ast import parse
-import socket
 import json
-import threading
+import socket
 import time
-# import tkinter as tk
-# from tkinter import scrolledtext
+import tkinter as tk
+from tkinter import scrolledtext
+import threading
 
-class HTTPClient:
+def buildJSON(args) -> dict:
+    """
+    Creates the JSON which will be sent to the server
+    """
+    ret = {}
+    for i in range(0, len(args) - 1, 2):
+        ret[args[i]] = args[i + 1]
+    return ret
+
+class Client:
+    """
+    A class to represent the client which is connecting to the server.
+
+    This class uses a client socket to send and receive messages from the server. It allows the user to 
+    provide commands konwn by the server which will be executed on the server, then receive the response
+    from the server.
+
+    Attributes:
+    ----------
+    host : str
+        The host to connect to the server on using the socket.
+    port : int
+        The port of the host of the server to connect to using the server.
+
+    Methods:
+    -------
+    connect():
+        Connects to the server using the socket.
+    send_message(message)
+        Sends a message to the server.
+    execute_command(command):
+        Executes a command that was received from the user by sending it to the server.
+    receive_response():
+        Receives the server's response.
+    format_response(response):
+        Formats the response to show the user.
+    format_response_data(response):
+        Formats the response based on the data-type of the message.
+    close():
+        Closes the socket's connection to the server.
+    """
     def __init__(self, host="localhost", port=6789):
         self.host = host
         self.port = port
         self.clientSocket = None
 
     def connect(self):
+        """ Connects to the server. """
         if self.clientSocket:
             print("Already connected.")
             return
@@ -23,7 +63,61 @@ class HTTPClient:
         except Exception as e:
             print(f"Connection failed: {e}")
             self.clientSocket = None
+        
+    def send_message(self, message: str):
+        """ Sends the given message to the server. """
+        self.clientSocket.sendall((json.dumps(message) + "\n").encode("utf-8"))
 
+    def execute_command(self, command: str):
+        """ Executes the command received from the user by sending to the server. """
+        print(f"Executing command: {command}")
+        parsedComms = command.split(" ")
+        command = parsedComms[0]
+        if command == "connect":
+            self.connect()
+            # Start listening for messages after connecting
+            return True
+        elif command == "join":
+            if len(parsedComms) == 2:
+                message = buildJSON(["type", "clientRequest", "action", "join", "username", parsedComms[1]])
+            else:
+                message = buildJSON(["type", "clientRequest", "action", "join"])
+            self.send_message(message)
+        elif command == "post":
+            if len(parsedComms) >= 3:
+                messageSubject = parsedComms[1]
+                messageContent = " ".join(parsedComms[2:])
+                message = buildJSON(["type", "clientRequest", "action", "postMessage", "messageSubject", messageSubject, "messageContent", messageContent])
+                self.send_message(message)
+                print(f"Post request sent: {message}")
+            else:
+                print("ERROR: You must submit the subject and the content for the message to be sent.")
+        elif command == "leave":
+            if (len(parsedComms))!=1:
+                print("ERROR: Leave command does not take any arguments")
+            message = buildJSON(["type", "clientRequest", "action", "leave"])
+            self.send_message(message)
+        elif command == "message":
+            if (len(parsedComms)!=2):
+                print("ERROR: message command takes 1 parameter only: messageID")
+            message = buildJSON(["type", "clientRequest", "action", "getMessage", "messageID",int(parsedComms[1])])
+            self.send_message(message)
+        elif command == "users":
+            #retrieve list of users
+            message = buildJSON(["type", "clientRequest", "action", "getUsers"])
+            self.send_message(message)
+        elif command == "exit":
+            #need to perform a %leave if not already done to clean the connection up
+            message = buildJSON(["type", "clientRequest", "action", "leave"])
+            self.send_message(message)
+            #close connection and return false as we are no longer running
+            client.close()
+            return False
+        else:
+            print("Invalid Command.")
+            return True
+
+        return True
 
     def receive_response(self):
         """Receive the server's response, handling timeouts."""
@@ -36,191 +130,127 @@ class HTTPClient:
             print("Timeout reached while receiving data.")
         except Exception as e:
             print(f"Error receiving response: {e}")
+        print(response)
         return response.strip()  # Strip any trailing whitespace or newlines
-
+    
+    def format_response(self, response: str):
+        """ Formats the response to show to the user. """
+        response = json.loads(response)
+        data = self.format_response_data(response)
+        if (response['type'] == "ServerAffirm"):
+            message = f"Server (Affirmation): {data}"
+        elif(response['type'] == "ServerNotification"):
+            message = f"Server (Notification): {data}"
+        else:
+            message = f"Server (Error): {data}"
+        print(message)
+        return message
+    
+    def format_response_data(self, response: str):
+        """ Formats the response based on the data-type of the message. """
+        print(f"{response=}")
+        if response['data-type'] == "text":
+            return response['data']
+        elif response['data-type'] == "list":
+            message = response['data-title'] + "\n"
+            for item in response['data']:
+                message += f" - {item}\n"
+            return message
+        elif response["data-type"] == "message":
+            message = f"{response['message-id']}: {response['message-subject']}\n"
+            message += f"{response['post-date']}: {response['sender']}\n"
+            message += response['data']
+            message += "\n"
+            return message
 
     def close(self):
+        """ Closes the socket's connection to the server. """
         if self.clientSocket:
             self.clientSocket.close()
             self.clientSocket = None
             print("Connection closed")
 
-# class ClientGUI:
-#     def __init__(self, root):
-#         self.root = root
-#         self.root.title("Client Messaging Application")
-
-#         # Create a scrollable text area to display messages
-#         self.text_area = scrolledtext.ScrolledText(root, wrap=tk.WORD, state='disabled', width=50, height=20)
-#         self.text_area.grid(row=0, column=0, columnspan=2, padx=10, pady=10)
-
-#         # Entry box for user input
-#         self.input_box = tk.Entry(root, width=40)
-#         self.input_box.grid(row=1, column=0, padx=10, pady=10)
-#         self.input_box.bind("<Return>", self.send_message)
-
-#         # Send button
-#         self.send_button = tk.Button(root, text="Send", command=self.send_message)
-#         self.send_button.grid(row=1, column=1, padx=10, pady=10)
-
-def buildJSON(args) -> dict:
+class ClientGUI:
     """
-    Creates the JSON which will be sent to the server
+    A class to represent the graphical user interface for a client in a message board application.
+
+    This class provides the GUI for intereacting with the server via the client messaging system.
+    It allows the user to send commands and get the responses from the server and display them.
+
+    Attributes:
+    ----------
+    root : tkinter.Tk
+        The root window for the application.
+    client : Client
+        The client that is connected to the server via a socket.
+
+    Methods:
+    -------
+    display_message(message):
+        Appends a message to the board and updates the display.
+    send_message(event=None):
+        Sends the user's message to the server and updates the display.
+    start_receiving():
+        Starts a thread to continuously listen for messages from the server.
     """
-    ret = {}
-    for i in range(0, len(args) - 1, 2):
-        ret[args[i]] = args[i + 1]
-    return ret
+    def __init__(self, root, client: Client):
+        self.root = root
+        self.client = client
+        self.root.title("localhost:6789 Bulletin Board")
 
+        # Create a scrollable text area to display messages
+        self.text_area = scrolledtext.ScrolledText(root, wrap=tk.WORD, state='disabled', width=50, height=20)
+        self.text_area.grid(row=0, column=0, columnspan=2, padx=10, pady=10)
 
-# def listenForMessages(client: HTTPClient) -> None:
-#     """
-#     Continuously listens for messages from the server and processes them.
-#     """
-#     while True:
-#         try:
-#             if not client.clientSocket:
-#                 print("ERROR: Client is not connected to the server.")
-#                 break
-#             response = client.receive_response()
-#             if response:
-#                 print(f"Message from server: {response}")
-#             else:
-#                 print("No response received.")
-#         except socket.timeout:
-#             print("Waiting for more data...")
-#         except Exception as e:
-#             print(f"ERROR in listening thread: {e}")
-#             break
+        # Entry box for user input
+        self.input_box = tk.Entry(root, width=40)
+        self.input_box.grid(row=1, column=0, padx=10, pady=10)
+        self.input_box.bind("<Return>", self.send_message)
 
-def listenForMessages(client: HTTPClient) -> None:
-    """
-    Listens for messages from the server and when it catches them it will
-    output them based on the message
-    @param client: HTTPClient = The client which is receiving the messages
-    @returns: None
-    """
-    global mbActive
-    responseCache = [] # Cache which is used to hold resposnes that have not had the opportunity to be written
-    while True:
-        # Receive Response
-        response = client.receive_response()
-        response = json.loads(response)
+        # Send button
+        self.send_button = tk.Button(root, text="Send", command=self.send_message)
+        self.send_button.grid(row=1, column=1, padx=10, pady=10)
 
-        responseCache.append(response)
+    def display_message(self, message):
+        """Display a message in the text area."""
+        self.text_area.config(state='normal')
+        self.text_area.insert(tk.END, f"{message}\n")
+        self.text_area.yview(tk.END)  # Auto-scroll to the end
+        self.text_area.config(state='disabled')
 
-        if mbLock.locked():
-            continue
+    def send_message(self, event=None):
+        """Send a message to the server."""
+        message = self.input_box.get()
+        if message:
+            # Call your existing send_message function here
+            # send_message(message)
+            self.display_message(f"You: {message}")  # Display your own message
+            running = self.client.execute_command(message)
+            self.input_box.delete(0, tk.END)
+            if not running:
+                self.quit()
 
-        print(f"{response=}")
-        with mbLock:
-            while len(responseCache) != 0:
-                print(f"{responseCache=}")
-                response = responseCache.pop()
-                # ServerAffirm is returned when action is successful
-                if (response['type'] == "ServerAffirm"):
-                    print(f"Action {response['receivedData']['action']} was performed successfully.")
-                elif(response['type'] == "ServerNotification"):
-                    print(f"Message from Server: {response['data']}")
-                else:
-                    print(f"ERROR: Action {response['receivedData']['action']} returned error {response['error']}.")
-            mbActive = True
-                #time.sleep(0.5) # Waiting half a second so it doesn't run on an empty body
-
-
-def executeCommand(client: HTTPClient, command: str):
-    """
-    Executes the command from the CLI
-    """
-    global mbActive
-    parsedComms = command.split(" ")
-    command = parsedComms[0]
-    if command == "connect":
-        client.connect()
-        # Start listening for messages after connecting
-        listeningThread.start()
-        mbActive = True
-        return True
-    elif command == "join":
+    def start_receiving(self):
+        """Continuously check for messages from the server."""
+        def receive_loop():
+            while True:
+                if self.client.clientSocket:
+                    time.sleep(1)
+                    # Call your existing receive_message function here
+                    response = self.client.receive_response()
+                    formattedResponse = self.client.format_response(response)
+                    # response = "Server: Example response"  # Placeholder for server message
+                    self.display_message(formattedResponse)
         
-        if len(parsedComms) == 2:
-            message = buildJSON(["type", "clientRequest", "action", "join", "username", parsedComms[1]])
-        else:
-            message = buildJSON(["type", "clientRequest", "action", "join"])
+        threading.Thread(target=receive_loop, daemon=True).start()
 
-        # Send request without waiting for immediate response
-        client.clientSocket.sendall((json.dumps(message)+ "\n").encode("utf-8"))
-    elif command == "post":
-        if len(parsedComms) == 3:
-            messageSubject = parsedComms[1]
-            messageContent = parsedComms[2]
-            message = buildJSON(["type", "clientRequest", "action", "postMessage", "messageSubject", messageSubject, "messageContent", messageContent])
-            client.clientSocket.sendall((json.dumps(message)+ "\n").encode("utf-8"))
-            print(f"Post request sent: {message}")
-        else:
-            print("ERROR: You must submit the subject and the content for the message to be sent.")
-        print(client.receive_response())
-    elif command == "leave":
-        if (len(parsedComms))!=1:
-            print("ERROR: Leave command does not take any arguments")
-        message = buildJSON(["type", "clientRequest", "action", "leave"])
-        client.clientSocket.sendall((json.dumps(message)+ "\n").encode("utf-8"))
-    elif command == "message":
-        if (len(parsedComms)!=2):
-            print("ERROR: message command takes 1 parameter only: messageID")
-        message = buildJSON(["type", "clientRequest", "action", "getMessage", "messageID",int(parsedComms[1])])
-        client.clientSocket.sendall((json.dumps(message)+ "\n").encode("utf-8"))
-    elif command == "users":
-        #retrieve list of users
-        message = buildJSON(["type", "clientRequest", "action", "getUsers"])
-        client.clientSocket.sendall((json.dumps(message)+ "\n").encode("utf-8"))
-    elif command == "exit":
-        #need to perform a %leave if not already done to clean the connection up
-        message = buildJSON(["type", "clientRequest", "action", "leave"])
-        client.clientSocket.sendall((json.dumps(message)+ "\n").encode("utf-8"))
-        #close connection and return false as we are no longer running
-        client.close()
-        return False
-    else:
-        print("Invalid Command.")
-        mbActive = True
-        return True
-
-    # The message back from the server is handled on the listening thread
-    # Need to disable message board while waiting for response from server
-    mbActive = False
-    return True
-    
-
-    
-
-
-SERVER_ADDRESS = "localhost"
-SERVER_PORT = 6789
-
-mbLock = threading.Lock() # The lock which controls whether reading from messaging board or outputting messages from server
-mbActive = True # This is True if message board good to go. False if need to wait until server message read 
+    def quit(self):
+        print("Closing the GUI")
+        self.root.destroy()
 
 if __name__ == "__main__":
-    client = HTTPClient()
-
-    # Creating the listening thread
-    listeningThread = threading.Thread(target=listenForMessages, args=(client,))
-    listeningThread.daemon = True  # Exit thread when main program exits
-    # Main loop for the message board
-    running = True
-    while running:
-        if mbActive:
-            with mbLock:
-                # try:
-                command = input("Message Board> ")
-                running = executeCommand(client, command)
-                # except KeyboardInterrupt:
-                #     print("\nExiting.")
-                #     running = False
-
-    # Ensure the thread terminates gracefully
-    if listeningThread.is_alive():
-        listeningThread.join()
-    print("Exited cleanly.")
-
+    root = tk.Tk()
+    client = Client()
+    client_gui = ClientGUI(root, client)
+    client_gui.start_receiving()
+    root.mainloop()
