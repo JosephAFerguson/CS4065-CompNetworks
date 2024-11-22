@@ -51,7 +51,12 @@ final class MessageBoard {
     }
 
     public synchronized String[] getAllUsers() {
-        return users;
+        String[] returnUsers = new String[userInd+1];
+        for (int i= 0;i< userInd+1;i++)
+        {
+            returnUsers[i] = users[i];
+        }
+        return returnUsers;
     }
 
     public synchronized void addUser(String username) {
@@ -372,8 +377,59 @@ class TaskThread implements Runnable {
                 /*
                  * Here we need to add functionality to notify all other users of the new user
                  * We also need to show the new user to that 2 latest messages
+                 * We also need to show the new user the list of active users
                  */
-                notifyAllUsers(username + " has entered the message board");
+                Message blankM = new Message();
+                notifyAllUsers(false, blankM , username + " has entered the message board");
+                Message[] last2 = messageBoard.getLast2();
+                
+                if(last2[0] != null){
+                    // Send message to client
+                    JsonObject messageJson1 = Json.createObjectBuilder()
+                    .add("type", "ServerNotification")
+                    .add("data-type", "message")
+                    .add("message-id", last2[0].messageID)
+                    .add("sender", last2[0].sender)
+                    .add("post-date", last2[0].postDate)
+                    .add("message-subject", last2[0].subject)
+                    .add("data", last2[0].content)
+                    .build();
+                    sendJsonResponse(User.getOut(), messageJson1);
+                }
+                if(last2[1]!=null){
+                    // Send message to client
+                    JsonObject messageJson2 = Json.createObjectBuilder()
+                    .add("type", "ServerNotification")
+                    .add("data-type", "message")
+                    .add("message-id", last2[1].messageID)
+                    .add("sender", last2[1].sender)
+                    .add("post-date", last2[1].postDate)
+                    .add("message-subject", last2[1].subject)
+                    .add("data", last2[1].content)
+                    .build();
+                    sendJsonResponse(User.getOut(), messageJson2);
+                }
+
+                String[] allUsers = messageBoard.getAllUsers();
+
+                // Convert String[] to JsonArray using JsonArrayBuilder
+                JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();
+                for (String user : allUsers) {
+                    if (user == null) {
+                        break;
+                    }
+                    arrayBuilder.add(user);
+                }
+
+                JsonObject usersJson = Json.createObjectBuilder()
+                    .add("type", "ServerNotification")
+                    .add("data-type", "list")
+                    .add("data-title", "Users")
+                    .add("data", arrayBuilder.build())
+                    .build();
+                    sendJsonResponse(User.getOut(), usersJson);
+
+                
             } else if ("leave".equals(action)) {
 
                 if (username == null) { // handle a user trying to leave when they aren't in the group anyway
@@ -394,7 +450,8 @@ class TaskThread implements Runnable {
                         .build();
 
                 // Notify all users //This needs to be done before we remove the user
-                notifyAllUsers(username + " has left the message board");
+                Message blankM = new Message();
+                notifyAllUsers(false, blankM, username + " has left the message board");
 
                 // Remove the user from the message board and nullify the socket's username
                 // profile
@@ -436,7 +493,7 @@ class TaskThread implements Runnable {
                  * Here we need to add a functionality to notify all other users of the new
                  * message
                  */
-                notifyAllUsers(username + " posted: " + messageContent);// needs to be changed
+                notifyAllUsers(true, message, username + " posted: " + messageContent);// needs to be changed
             } else if ("getMessage".equals(action))// handles a get Message with message ID request
             {
                 if (username == null) {
@@ -515,20 +572,45 @@ class TaskThread implements Runnable {
         sendJsonResponse(out, responseJson);
     }
 
-    private void notifyAllUsers(String notificationMessage) {
-        for (Profile userProfile : Server.getActiveUsers().values()) {
-            try {
-                BufferedWriter clientOut = userProfile.getOut();
-                JsonObject notificationJson = Json.createObjectBuilder()
-                        .add("type", "ServerNotification")
-                        .add("data-type", "text")
-                        .add("data", notificationMessage)
-                        .build();
+    private void notifyAllUsers(Boolean M, Message message, String notificationMessage) {
+        if(M)
+        {
+            for (Profile userProfile : Server.getActiveUsers().values()) {
+                try {
+                    BufferedWriter clientOut = userProfile.getOut();
+                    JsonObject messageJson = Json.createObjectBuilder()
+                            .add("type", "ServerNotification")
+                            .add("data-type", "message")
+                            .add("message-id", message.messageID)
+                            .add("message-subject", message.subject)
+                            .add("post-date", message.postDate)
+                            .add("sender", message.sender)
+                            .add("data", message.content)
+                            .build();
 
-                clientOut.write(notificationJson.toString());
-                clientOut.flush();
-            } catch (IOException e) {
-                logger.info("Error notifying users: " + e.getMessage());
+                    clientOut.write(messageJson.toString());
+                    clientOut.flush();
+                } catch (IOException e) {
+                    logger.info("Error notifying users: " + e.getMessage());
+                }
+            }
+        }
+        else
+        {
+            for (Profile userProfile : Server.getActiveUsers().values()) {
+                try {
+                    BufferedWriter clientOut = userProfile.getOut();
+                    JsonObject notificationJson = Json.createObjectBuilder()
+                            .add("type", "ServerNotification")
+                            .add("data-type", "text")
+                            .add("data", notificationMessage)
+                            .build();
+
+                    clientOut.write(notificationJson.toString());
+                    clientOut.flush();
+                } catch (IOException e) {
+                    logger.info("Error notifying users: " + e.getMessage());
+                }
             }
         }
     }

@@ -133,35 +133,73 @@ class Client:
         print(response)
         return response.strip()  # Strip any trailing whitespace or newlines
     
-    def format_response(self, response: str):
-        """ Formats the response to show to the user. """
-        response = json.loads(response)
-        data = self.format_response_data(response)
-        if (response['type'] == "ServerAffirm"):
-            message = f"Server (Affirmation): {data}"
-        elif(response['type'] == "ServerNotification"):
-            message = f"Server (Notification): {data}"
-        else:
-            message = f"Server (Error): {data}"
-        print(message)
-        return message
+    def format_response(self, response):
+        """Formats the response to show to the user."""
+
+        #Handle if response is multiple jsons
+        multiples = []
+        closed = 0
+        flag = 0
+        content = ""
+        for ch in response:
+            content += ch
+            if ch == "{":
+                closed += 1
+                flag = True
+            elif ch == "}":
+                closed -= 1
+        
+            # When a complete JSON object is found
+            if closed == 0 and flag:
+                try:
+                    multiples.append(json.loads(content))
+                    content = ""
+                    flag = False
+                except json.JSONDecodeError:
+                    print(f"Error: Invalid JSON detected in fragment: {content}")
+                    content = ""
+                    flag = False
+                    return
+        
+        #Now, if we have multiple jsons, format all of them
+        returnList = []
+        for validJson in multiples:
+            data = self.format_response_data(validJson)
+            response_type = validJson.get('type', 'Unknown')
+            
+            if response_type == "ServerAffirm":
+                message = f"Server (Affirmation): {data}"
+            elif response_type == "ServerNotification":
+                message = f"Server (Notification): {data}"
+            else:
+                message = f"Server (Error): {data}"
+            
+            print(message)
+            returnList.append(message)
+        return returnList
     
-    def format_response_data(self, response: str):
-        """ Formats the response based on the data-type of the message. """
-        print(f"{response=}")
-        if response['data-type'] == "text":
-            return response['data']
-        elif response['data-type'] == "list":
-            message = response['data-title'] + "\n"
-            for item in response['data']:
-                message += f" - {item}\n"
+    def format_response_data(self, response: dict) -> str:
+        """Formats the response based on the data-type of the message."""
+        print(f"{response=}")  # Debug statement; remove or replace with logging in production.
+        
+        data_type = response.get('data-type', 'unknown')
+        if data_type == "text":
+            return response.get('data', "No data available")
+        elif data_type == "list":
+            return f"{response.get('data-title', 'List')}\n" + "\n".join(
+                f" - {item}" for item in response.get('data', [])
+            )
+        elif data_type == "message":
+            message = (
+                f"Message-ID : {response.get('message-id', 'Unknown ID')}\n"
+                f"Message-Subject : {response.get('message-subject', 'No Subject')}\n"
+                f"Post-Date : {response.get('post-date', 'Unknown Date')}\n"
+                f"Sender : {response.get('sender', 'Unknown Sender')}\n"
+                f"{response.get('data', 'No message data')}\n"
+            )
             return message
-        elif response["data-type"] == "message":
-            message = f"{response['message-id']}: {response['message-subject']}\n"
-            message += f"{response['post-date']}: {response['sender']}\n"
-            message += response['data']
-            message += "\n"
-            return message
+        else:
+            return "Unknown data type"
 
     def close(self):
         """ Closes the socket's connection to the server. """
@@ -240,11 +278,15 @@ class ClientGUI:
                     response = self.client.receive_response()
                     formattedResponse = self.client.format_response(response)
                     # response = "Server: Example response"  # Placeholder for server message
-                    self.display_message(formattedResponse)
+                    #Response may contain multiple
+                    if formattedResponse is not None:
+                        for resp in formattedResponse:
+                            self.display_message(resp)
         
         threading.Thread(target=receive_loop, daemon=True).start()
 
     def quit(self):
+        self.client.close()
         print("Closing the GUI")
         self.root.destroy()
 
