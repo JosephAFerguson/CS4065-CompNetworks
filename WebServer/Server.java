@@ -1,13 +1,25 @@
 package com.example;
 
-import javax.json.*;
-
-import java.util.HashMap;
-import java.util.concurrent.*;
-import java.util.logging.*;
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.StringReader;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.time.LocalDate;
-import java.net.*;
+import java.util.HashMap;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.logging.Logger;
+
+import javax.json.Json;
+import javax.json.JsonArrayBuilder;
+import javax.json.JsonException;
+import javax.json.JsonObject;
+import javax.json.JsonReader;
 
 final class CONSTANTS {
     public final static int MAX_USERS = 100;
@@ -22,7 +34,7 @@ final class Message {
     String content;
 }
 
-final class MessageBoard {
+class MessageBoard {
     private HashMap<Integer, Message> messages;
     private Message[] messagesByDate;
     private String[] users;
@@ -134,6 +146,22 @@ final class MessageBoard {
     }
 }
 
+final class PrivateMessageBoard extends MessageBoard {
+    private int groupID;
+    private String groupName;
+
+    public PrivateMessageBoard(Integer groupID, String groupName){
+        super();
+        this.groupID = groupID;
+        this.groupName = groupName;
+    }
+    public Integer getGroupId(){
+        return groupID;
+    }
+    public String getGroupName(){
+        return groupName;
+    }
+}
 final class Task {
     private int clientSocketHash;
     private JsonObject request;
@@ -200,12 +228,19 @@ public final class Server {
 
     public static void main(String[] argv) throws Exception {
 
-        // Establish Message Board
+        // Establish Public and Private Message Boards
         MessageBoard messageBoard = new MessageBoard();
+        PrivateMessageBoard[] privateGroups = new PrivateMessageBoard[5];
+        privateGroups[0] = new PrivateMessageBoard(0, "Engineers");
+        privateGroups[1] = new PrivateMessageBoard(1, "Scientists");
+        privateGroups[2] = new PrivateMessageBoard(2, "Teachers");
+        privateGroups[3] = new PrivateMessageBoard(3, "Blue Collars");
+        privateGroups[4] = new PrivateMessageBoard(4, "Retirees");
+
         int port = 6789;
 
         // The thread will will send all notifications and process requests
-        Thread taskThread = new Thread(new TaskThread(taskQueue, messageBoard));
+        Thread taskThread = new Thread(new TaskThread(taskQueue, messageBoard, privateGroups));
         taskThread.start();
 
         // Establish the listen socket
@@ -257,10 +292,12 @@ class TaskThread implements Runnable {
     private BlockingQueue<Task> taskQueue;
     private static final Logger logger = Logger.getLogger(TaskThread.class.getName());
     private MessageBoard messageBoard;
+    private PrivateMessageBoard[] privateGroups;
 
-    public TaskThread(BlockingQueue<Task> taskQueue, MessageBoard messageBoard) {
+    public TaskThread(BlockingQueue<Task> taskQueue, MessageBoard messageBoard, PrivateMessageBoard[] privateGroups) {
         this.taskQueue = taskQueue;
         this.messageBoard = messageBoard;
+        this.privateGroups = privateGroups;
     }
 
     @Override
