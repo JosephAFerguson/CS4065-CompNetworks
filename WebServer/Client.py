@@ -64,7 +64,7 @@ class Client:
             print(f"Connection failed: {e}")
             self.clientSocket = None
         
-    def send_message(self, message: str):
+    def send_message(self, message):
         """ Sends the given message to the server. """
         self.clientSocket.sendall((json.dumps(message) + "\n").encode("utf-8"))
 
@@ -77,6 +77,12 @@ class Client:
             self.connect()
             # Start listening for messages after connecting
             return True
+        elif command == "help":
+            if len(parsedComms)==1:
+                message = buildJSON(["type", "clientRequest", "action", "help"])
+                self.send_message(message)
+            else:
+                print("ERROR: The help command does not take any arguments.")
         elif command == "join":
             if len(parsedComms) == 2:
                 message = buildJSON(["type", "clientRequest", "action", "join", "username", parsedComms[1]])
@@ -93,19 +99,60 @@ class Client:
             else:
                 print("ERROR: You must submit the subject and the content for the message to be sent.")
         elif command == "leave":
-            if (len(parsedComms))!=1:
+            if (len(parsedComms))==1:
+                message = buildJSON(["type", "clientRequest", "action", "leave"])
+                self.send_message(message)
+            else:
                 print("ERROR: Leave command does not take any arguments")
-            message = buildJSON(["type", "clientRequest", "action", "leave"])
-            self.send_message(message)
         elif command == "message":
-            if (len(parsedComms)!=2):
+            if (len(parsedComms)==2):
+                message = buildJSON(["type", "clientRequest", "action", "getMessage", "messageID",int(parsedComms[1])])
+                self.send_message(message)
+            else:
                 print("ERROR: message command takes 1 parameter only: messageID")
-            message = buildJSON(["type", "clientRequest", "action", "getMessage", "messageID",int(parsedComms[1])])
-            self.send_message(message)
         elif command == "users":
             #retrieve list of users
             message = buildJSON(["type", "clientRequest", "action", "getUsers"])
             self.send_message(message)
+        elif command == "groups":
+            #retrieve list of groups
+            message = buildJSON(["type", "clientRequest", "action", "getGroups"])
+            self.send_message(message)
+        elif command == "groupjoin":
+            #request to join group
+            if len(parsedComms)==2:
+                message = buildJSON(["type", "clientRequest", "action", "groupJoin", "groupID", int(parsedComms[1])])
+            else:
+                print("ERROR: You must provide the id of the private group to join")
+            self.send_message(message)
+        elif command == "grouppost":
+            if len(parsedComms)>=4:
+                groupID = int(parsedComms[1])
+                messageSubject = parsedComms[2]
+                messageContent = " ".join(parsedComms[3:])
+                message = buildJSON(["type", "clientRequest", "action", "groupPostMessage","groupID", groupID,  "messageSubject", messageSubject, "messageContent", messageContent])
+                self.send_message(message)
+                print(f"Post request sent: {message}")
+            else:
+                print("ERROR: You must submit the groupID, subject, and the content for the message to be sent in the private group.")
+        elif command == "groupusers":
+            if len(parsedComms)==2:
+                message = buildJSON(["type", "clientRequest", "action", "getGroupUsers", "groupID", int(parsedComms[1])])
+                self.send_message(message)
+            else:
+                print("ERROR: groupusers command needs to have a groupID specified")
+        elif command == "groupmessage":
+            if len(parsedComms)==3:
+                message = buildJSON(["type", "clientRequest", "action", "getGroupMessage", "groupID", int(parsedComms[1]), "messageID", int(parsedComms[2])])
+                self.send_message(message)
+            else:
+                print("ERROR: groupmessage command needs to have a groupID and messageID specified")
+        elif command == "groupleave":
+            if len(parsedComms)==2:
+                message = buildJSON(["type", "clientRequest", "action", "groupLeave", "groupID", int(parsedComms[1])])
+                self.send_message(message)
+            else:
+                print("ERROR: groupleave command needs to have a groupID specified")
         elif command == "exit":
             #need to perform a %leave if not already done to clean the connection up
             message = buildJSON(["type", "clientRequest", "action", "leave"])
@@ -191,6 +238,7 @@ class Client:
             )
         elif data_type == "message":
             message = (
+                f"Group : {response.get('group', 'Unknown Group')}\n" 
                 f"Message-ID : {response.get('message-id', 'Unknown ID')}\n"
                 f"Message-Subject : {response.get('message-subject', 'No Subject')}\n"
                 f"Post-Date : {response.get('post-date', 'Unknown Date')}\n"
@@ -248,6 +296,9 @@ class ClientGUI:
         # Send button
         self.send_button = tk.Button(root, text="Send", command=self.send_message)
         self.send_button.grid(row=1, column=1, padx=10, pady=10)
+
+        # Display Start Message
+        self.display_message("Welcome: Enter connect to get started!")
 
     def display_message(self, message):
         """Display a message in the text area."""
