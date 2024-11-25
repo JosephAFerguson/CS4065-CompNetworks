@@ -9,6 +9,7 @@ import java.io.StringReader;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -377,10 +378,97 @@ class TaskThread implements Runnable {
         String type = jsonObject.getString("type");
         String action = jsonObject.getString("action");
 
+        //Welcome user to server and prompt for username
+        if ("ServerWelcome".equals(type)){
+            logger.info("Welcoming new user to server, providing help and start commands");
+
+            JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();
+            arrayBuilder.add("Welcome to the Server: Please Join The Public Group by inputting join followed by your choice of username");
+            arrayBuilder.add("For info on all other commands, enter help");
+
+            responseJson = Json.createObjectBuilder()
+                    .add("type", "ServerAffirm")
+                    .add("data-type", "list")
+                    .add("data-title", "Welcome")
+                    .add("data", arrayBuilder)
+                    .add("receivedData", jsonObject)
+                    .build();
+            sendJsonResponse(out, responseJson);
+
+            //User is requesting groups in which he can join
+            //privateGroups
+            JsonArrayBuilder arrayBuilder2 = Json.createArrayBuilder();
+
+            // Add each group to the JSON array
+            for (PrivateMessageBoard pg : privateGroups) {
+                String showcase = "Group Name: " + pg.getGroupName() + " - ID:" + pg.getGroupId();
+                arrayBuilder2.add(showcase);
+            }
+            JsonObject responseJson2;
+            
+            responseJson2 = Json.createObjectBuilder()
+                    .add("type", "ServerAffirm")
+                    .add("data-type", "list")
+                    .add("data-title", "Groups")
+                    .add("data", arrayBuilder2)
+                    .add("receivedData", jsonObject)
+                    .build();
+
+            sendJsonResponse(out, responseJson2);
+            return;
+
         // Handling all clientRequest requests
         // One can observe that each action will match a Client possible option
-        if ("clientRequest".equals(type)) {
-            if ("join".equals(action)) {
+        } else if ("ServerRemove".equals(type)) {
+            // Notify all users //This needs to be done before we remove the user
+            Message blankM = new Message();
+            notifyAllUsers(false, blankM, username + " has left the message board");
+            
+            //Get List of Private Groups user is in
+            ArrayList<Integer> whichGroupsUserIn = new ArrayList<Integer>();
+            for(int i =0;i<5;i++){
+                if(privateGroups[i].getUser(username)){
+                    whichGroupsUserIn.add(i);
+                }
+            }
+            notifyAllPrivateUsers(whichGroupsUserIn, false, blankM, username + " has left the private message board: ");
+            // Remove the user from the private message groups and the public message board and nullify the socket's username
+            // profile
+            for(int i = 0; i<5;i++){
+                privateGroups[i].removeUser(username);
+            }
+            messageBoard.removeUser(username);
+            User.setUsername(null);
+            return;//no serveraffirm as user disconnected
+        } else if ("clientRequest".equals(type)) {
+
+            if ("help".equals(action)){
+                //provide list of commands
+                JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();
+                arrayBuilder.add("Command [param1] [param2, etc] - Info on Command");
+                arrayBuilder.add("join [username] - Lets you join the public group with a specified unique username");
+                arrayBuilder.add("post [messageSubject(no spaces)] [content(spaces allowed)] - Lets you post a message to the public group");
+                arrayBuilder.add("users - Lets you see a list of users in the public group");
+                arrayBuilder.add("leave - Lets you leave the public group, which will also kick you from any private groups as well");
+                arrayBuilder.add("message [messageID] - Lets you retrieve the content of a message with a given MessageID");
+                arrayBuilder.add("exit - Lets you disconnect from the server entirely");
+                arrayBuilder.add("groups - Lets you see a list of private groups, provided you are in the public group");
+                arrayBuilder.add("grouppost [groupID] [messageSubject(no spaces)] [content(spaces allowed)] - Lets you post a message to the private group specified with the groupID, with the provided subject and content, given that the user is in the private group");
+                arrayBuilder.add("groupjoin [groupID] - Lets you join a private group with the specified groupID");
+                arrayBuilder.add("groupusers [groupID] - Lets you see the list of users from a private group with the specified groupID, provided you are in the private group");
+                arrayBuilder.add("groupleave [groupID] - Lets you leave a private group with the specified groupID, provided you are in the private group");
+                arrayBuilder.add("groupmessage [groupID] [messageID] - Lets you see the content of a private group message from a private group with the specified groupID and messageID, provided you are in the private group");
+
+                responseJson = Json.createObjectBuilder()
+                        .add("type", "ServerAffirm")
+                        .add("data-type", "list")
+                        .add("data-title", "Commands")
+                        .add("data", arrayBuilder)
+                        .add("receivedData", jsonObject)
+                        .build();
+                sendJsonResponse(out, responseJson);
+                return;
+            } else if ("join".equals(action)) {
                 // Handles the client join functionality
 
                 logger.info("Performing join operation.");
@@ -425,6 +513,7 @@ class TaskThread implements Runnable {
                     JsonObject messageJson1 = Json.createObjectBuilder()
                     .add("type", "ServerNotification")
                     .add("data-type", "message")
+                    .add("group", "Public")
                     .add("message-id", last2[0].messageID)
                     .add("sender", last2[0].sender)
                     .add("post-date", last2[0].postDate)
@@ -438,6 +527,7 @@ class TaskThread implements Runnable {
                     JsonObject messageJson2 = Json.createObjectBuilder()
                     .add("type", "ServerNotification")
                     .add("data-type", "message")
+                    .add("group", "Public")
                     .add("message-id", last2[1].messageID)
                     .add("sender", last2[1].sender)
                     .add("post-date", last2[1].postDate)
@@ -469,7 +559,7 @@ class TaskThread implements Runnable {
                 
             } else if ("leave".equals(action)) {
 
-                if (username == null) { // handle a user trying to leave when they aren't in the group anyway
+                if (username.equals(null)) { // handle a user trying to leave when they aren't in the group anyway
                     logger.info("This client is not in the message group: Leave Operation invalid");
                     String errorMessage = "In order to perform leave command, user must first be in message Board";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
@@ -489,19 +579,29 @@ class TaskThread implements Runnable {
                 // Notify all users //This needs to be done before we remove the user
                 Message blankM = new Message();
                 notifyAllUsers(false, blankM, username + " has left the message board");
-
-                // Remove the user from the message board and nullify the socket's username
+                
+                //Get List of Private Groups user is in
+                ArrayList<Integer> whichGroupsUserIn = new ArrayList<Integer>();
+                for(int i =0;i<5;i++){
+                    if(privateGroups[i].getUser(username)){
+                        whichGroupsUserIn.add(i);
+                    }
+                }
+                notifyAllPrivateUsers(whichGroupsUserIn, false, blankM, username + " has left the private message board: ");
+                // Remove the user from the private message groups and the public message board and nullify the socket's username
                 // profile
+                for(int i = 0; i<5;i++){
+                    privateGroups[i].removeUser(username);
+                }
                 messageBoard.removeUser(username);
                 User.setUsername(null);
-            } else if ("postMessage".equals(action)) // Handles post Message request
-            {
+            } else if ("postMessage".equals(action)) {// Handles post Message request
                 if (!jsonObject.containsKey("messageContent") || !jsonObject.containsKey("messageSubject")) {
-                    String errorMessage = "In order to perform join command, you must include key 'username', key 'messageContent', key 'messageSubject' in request";
+                    String errorMessage = "In order to post a public message you must include messageContent and messageSubject";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
                     return;
                 }
-                System.out.println("Performing join operation.");
+                logger.info("Performing message post operation.");
 
                 String messageContent = jsonObject.getString("messageContent");
                 String messageSubject = jsonObject.getString("messageSubject");
@@ -531,9 +631,8 @@ class TaskThread implements Runnable {
                  * message
                  */
                 notifyAllUsers(true, message, username + " posted: " + messageContent);// needs to be changed
-            } else if ("getMessage".equals(action))// handles a get Message with message ID request
-            {
-                if (username == null) {
+            } else if ("getMessage".equals(action)) {// handles a get Message with message ID request
+                if (username.equals(null)) {
                     String errorMessage = "To get a message the user must be in the public group, try performing the join first";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
                     return;
@@ -544,7 +643,7 @@ class TaskThread implements Runnable {
                     return;
                 }
                 int messageID = jsonObject.getInt("messageID");
-                Message message;
+                Message message = new Message();
                 if (messageBoard.tryMessageID(messageID)) {
                     message = messageBoard.getMessage(messageID);
                 } else {
@@ -555,6 +654,7 @@ class TaskThread implements Runnable {
                 responseJson = Json.createObjectBuilder()
                         .add("type", "ServerAffirm")
                         .add("data-type", "message")
+                        .add("group", "Public")
                         .add("message-id", message.messageID)
                         .add("sender", message.sender)
                         .add("post-date", message.postDate)
@@ -562,8 +662,10 @@ class TaskThread implements Runnable {
                         .add("data", message.content)
                         .add("receivedData", jsonObject)
                         .build();
+                sendJsonResponse(out, responseJson);
+                return;
             } else if ("getUsers".equals(action)) {
-                if (username == null) {
+                if (username.equals(null)) {
                     String errorMessage = "To get a list of users the user must be in the public group, try performing the join first";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
                     return;
@@ -590,6 +692,286 @@ class TaskThread implements Runnable {
                 sendJsonResponse(out, responseJson);
                 return;
 
+            } else if ("getGroups".equals(action)){
+                //User is requesting groups in which he can join
+                //privateGroups
+                JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();
+
+                // Add each group to the JSON array
+                for (PrivateMessageBoard pg : privateGroups) {
+                    String showcase = "Group Name: " + pg.getGroupName() + " - ID:" + pg.getGroupId();
+                    arrayBuilder.add(showcase);
+                }
+
+                responseJson = Json.createObjectBuilder()
+                        .add("type", "ServerAffirm")
+                        .add("data-type", "list")
+                        .add("data-title", "Groups")
+                        .add("data", arrayBuilder)
+                        .add("receivedData", jsonObject)
+                        .build();
+
+                sendJsonResponse(out, responseJson);
+                return;
+
+            } else if ("groupJoin".equals(action)){
+                //User is to join a group
+                //privateGroups
+
+                //User needs to provide groupID
+                if (!jsonObject.containsKey("groupID")) {
+                    String errorMessage = "In order to to join a group, groupID must be provided";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+                int groupID = jsonObject.getInt("groupID");
+
+                //Handle case upon user not having username yet
+                if (username==null) {
+                    String errorMessage = "You must join the public group and have a username prior to joining a private group";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+
+                //Handle case upon user already being in group
+                if (privateGroups[groupID].getUser(username)) {
+                    String errorMessage = "To join a group you must not already be in the group and have a unique username for that group";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+
+                //add user to group
+                privateGroups[groupID].addUser(username);
+
+                //send affirm
+                responseJson = Json.createObjectBuilder()
+                        .add("type", "ServerAffirm")
+                        .add("data-type", "text")
+                        .add("data", "User request to join private group successful")
+                        .add("receivedData", jsonObject)
+                        .build();
+
+                sendJsonResponse(out, responseJson);
+
+                //give him the past two messages from the private group
+                /*
+                 * Here we need to add functionality to notify all other users of the new user
+                 * We also need to show the new user to that 2 latest messages
+                 * We also need to show the new user the list of active users
+                 */
+
+                Message blankM = new Message();
+                ArrayList<Integer> pgs = new ArrayList<Integer>();
+                pgs.add(groupID);
+                notifyAllPrivateUsers(pgs, false, blankM, username + " has joined the private message board : ");
+                //change this
+                //notifyAllUsers(false, blankM , username + " has entered the message board");
+                Message[] last2 = privateGroups[groupID].getLast2();
+                
+                if(last2[0] != null){
+                    // Send message to client
+                    JsonObject messageJson1 = Json.createObjectBuilder()
+                    .add("type", "ServerNotification")
+                    .add("data-type", "message")
+                    .add("group", privateGroups[groupID].getGroupName())
+                    .add("message-id", last2[0].messageID)
+                    .add("sender", last2[0].sender)
+                    .add("post-date", last2[0].postDate)
+                    .add("message-subject", last2[0].subject)
+                    .add("data", last2[0].content)
+                    .build();
+                    sendJsonResponse(User.getOut(), messageJson1);
+                }
+                if(last2[1]!=null){
+                    // Send message to client
+                    JsonObject messageJson2 = Json.createObjectBuilder()
+                    .add("type", "ServerNotification")
+                    .add("data-type", "message")
+                    .add("group", privateGroups[groupID].getGroupName())
+                    .add("message-id", last2[1].messageID)
+                    .add("sender", last2[1].sender)
+                    .add("post-date", last2[1].postDate)
+                    .add("message-subject", last2[1].subject)
+                    .add("data", last2[1].content)
+                    .build();
+                    sendJsonResponse(User.getOut(), messageJson2);
+                }
+
+                String[] allUsers = privateGroups[groupID].getAllUsers();
+
+                // Convert String[] to JsonArray using JsonArrayBuilder
+                JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();
+                for (String user : allUsers) {
+                    if (user == null) {
+                        break;
+                    }
+                    arrayBuilder.add(user);
+                }
+
+                JsonObject usersJson = Json.createObjectBuilder()
+                    .add("type", "ServerNotification")
+                    .add("data-type", "list")
+                    .add("data-title", "Private: ID - " + privateGroups[groupID].getGroupId() + " - Name - " + privateGroups[groupID].getGroupName() + " Users")
+                    .add("data", arrayBuilder.build())
+                    .build();
+                    sendJsonResponse(User.getOut(), usersJson);
+                return;
+
+            } else if ("groupPostMessage".equals(action)){
+                if (!jsonObject.containsKey("messageContent") || !jsonObject.containsKey("messageSubject") || !jsonObject.containsKey("groupID")) {
+                    String errorMessage = "In order to post a private group message you must include the groupID, messageContent, and messageSubject";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+                int groupID = jsonObject.getInt("groupID");
+                if (username.equals(null)){
+                    String errorMessage = "In order to post a private group message you must be in the public group first.";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+                if (!privateGroups[groupID].getUser(username)){
+                    String errorMessage = "In order to post a private group message you must be in the private group first.";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                }
+                String messageContent = jsonObject.getString("messageContent");
+                String messageSubject = jsonObject.getString("messageSubject");
+                int messageID = messageBoard.getMessageID();
+                Message message = new Message();
+                message.content = messageContent;
+                message.subject = messageSubject;
+                message.messageID = messageID;
+                message.postDate = LocalDate.now().toString();
+                message.sender = username;
+
+                privateGroups[groupID].addMessage(messageID, message);
+                responseJson = Json.createObjectBuilder()
+                        .add("type", "ServerAffirm")
+                        .add("data-type", "text")
+                        .add("data", username + " successfully posted message " + messageID + " to the message board.")
+                        .add("receivedData", jsonObject)
+                        .build();
+                /*
+                 * Here we need to add a functionality to notify all other users of the new
+                 * message
+                 */
+                ArrayList<Integer> pgs = new ArrayList<Integer>();
+                pgs.add(groupID);
+                notifyAllPrivateUsers(pgs, true, message, username + " posted: " + messageContent);// needs to be changed
+    
+                return;
+            } else if ("getGroupUsers".equals(action)){
+                if (username.equals(null)) {
+                    String errorMessage = "To get a list of private group users the user must be in the public group, try performing the join first";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+                if (!jsonObject.containsKey("groupID")){
+                    String errorMessage = "To get a list of private group users the groupID must be provided";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+                int groupID = jsonObject.getInt("groupID");
+                String[] users = privateGroups[groupID].getAllUsers();
+                JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();
+
+                // Add each user to the JSON array
+                for (String user : users) {
+                    if (user == null) {
+                        break;
+                    }
+                    arrayBuilder.add(user);
+                }
+
+                // Build the response JSON object
+                responseJson = Json.createObjectBuilder()
+                        .add("type", "ServerAffirm")
+                        .add("data-type", "list")
+                        .add("data-title", "Private: ID - " + privateGroups[groupID].getGroupId() + " - Name - " + privateGroups[groupID].getGroupName() + " Users:")
+                        .add("data", arrayBuilder)
+                        .add("receivedData", jsonObject)
+                        .build();
+                sendJsonResponse(out, responseJson);
+                return;
+
+            } else if ("groupLeave".equals(action)){
+                if (username.equals(null)) {
+                    String errorMessage = "To leave a private group you must first be in the public group and in a private group";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+                if (!jsonObject.containsKey("groupID")){
+                    String errorMessage = "To leave a private group the groupID must be provided";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+                int groupID = jsonObject.getInt("groupID");
+
+                if(!privateGroups[groupID].getUser(username)){
+                    String errorMessage = "To leave a private group you must be in the private group first.";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+                
+                ArrayList<Integer> pgs = new ArrayList<Integer>();
+                pgs.add(groupID);
+                Message blankM = new Message();
+
+                privateGroups[groupID].removeUser(username);
+                notifyAllPrivateUsers(pgs, false, blankM, username + " has left the private: ");
+                // Build the response JSON object
+                responseJson = Json.createObjectBuilder()
+                        .add("type", "ServerAffirm")
+                        .add("data-type", "text")
+                        .add("data", "Client request to leave private group successful")
+                        .add("receivedData", jsonObject)
+                        .build();
+
+                sendJsonResponse(out, responseJson);
+                return;
+            } else if ("getGroupMessage".equals(action)){
+                if (username.equals(null)) {
+                    String errorMessage = "To get a list of private group users the user must be in the public group, try performing the join first";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+                if (!jsonObject.containsKey("groupID")||!jsonObject.containsKey("messageID")){
+                    String errorMessage = "To get a list of private group users the groupID and messageID must be provided";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+                int groupID = jsonObject.getInt("groupID");
+
+                if(!privateGroups[groupID].getUser(username)){
+                    String errorMessage = "To get a message from a private group you must be in the private group first.";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+                int messageID = jsonObject.getInt("messageID");
+
+                Message message = new Message();
+                if (privateGroups[groupID].tryMessageID(messageID)) {
+                    message = privateGroups[groupID].getMessage(messageID);
+                } else {
+                    String errorMessage = "Message ID does not exist in this message board";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+
+                responseJson = Json.createObjectBuilder()
+                        .add("type", "ServerAffirm")
+                        .add("data-type", "message")
+                        .add("group", "Private: ID - " + privateGroups[groupID].getGroupId() + " - Name - " + privateGroups[groupID].getGroupName())
+                        .add("message-id", message.messageID)
+                        .add("sender", message.sender)
+                        .add("post-date", message.postDate)
+                        .add("message-subject", message.subject)
+                        .add("data", message.content)
+                        .add("receivedData", jsonObject)
+                        .build();
+
+                sendJsonResponse(out, responseJson);
+                return;
+
             } else {
                 // Handles the situation in which the action is invalid
                 // The action should match one of the possible actions for the client
@@ -605,12 +987,74 @@ class TaskThread implements Runnable {
             sendErrorJsonResponse(out, jsonObject, errorMessage);
             return;
         }
-
         sendJsonResponse(out, responseJson);
     }
+    private void notifyAllPrivateUsers(ArrayList<Integer> whichPrivateGroups, Boolean M, Message message, String notificationMessage){
+        if(M) //if it is a new message or not
+        {
+            //need notify users in a private group(s) about new message
+            for(int groupID : whichPrivateGroups){
 
+                //inefficient, but we go through each user profile connected to the server,
+                //test if they are apart of the specific privateGroup, and try sending them the data if they are
+                for (Profile userProfile : Server.getActiveUsers().values()) {
+
+                    String name = userProfile.getUserName();//get name of connected user
+
+                    if(privateGroups[groupID].getUser(name)){//test if they are in privateGroup
+                        try {
+                            BufferedWriter clientOut = userProfile.getOut();
+                            JsonObject messageJson = Json.createObjectBuilder()
+                                    .add("type", "ServerNotification")
+                                    .add("data-type", "message")
+                                    .add("group", "Private: ID - " + privateGroups[groupID].getGroupId() + " - Name - " + privateGroups[groupID].getGroupName())
+                                    .add("message-id", message.messageID)
+                                    .add("message-subject", message.subject)
+                                    .add("post-date", message.postDate)
+                                    .add("sender", message.sender)
+                                    .add("data", message.content)
+                                    .build();
+        
+                            clientOut.write(messageJson.toString());
+                            clientOut.flush();
+                        } catch (IOException e) {
+                            logger.info("Error notifying users: " + e.getMessage());
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            //need to notify users in a private group(s) about new notification
+            //need notify users in a private group(s) about new message
+            for(int groupID : whichPrivateGroups){
+                //same thing as in above if case
+                for (Profile userProfile : Server.getActiveUsers().values()) {
+
+                    String name = userProfile.getUserName();//get name of connected user
+
+                    if(privateGroups[groupID].getUser(name)){
+                        try {
+                            BufferedWriter clientOut = userProfile.getOut();
+                            JsonObject notificationJson = Json.createObjectBuilder()
+                                    .add("type", "ServerNotification")
+                                    .add("data-type", "text")
+                                    .add("data", notificationMessage + "Private: ID - " + privateGroups[groupID].getGroupId() + " - Name - " + privateGroups[groupID].getGroupName())
+                                    .build();
+        
+                            clientOut.write(notificationJson.toString());
+                            clientOut.flush();
+                        } catch (IOException e) {
+                            logger.info("Error notifying users: " + e.getMessage());
+                        }
+                    }
+                }
+            }
+        }
+    }
     private void notifyAllUsers(Boolean M, Message message, String notificationMessage) {
-        if(M)
+        if(M) // If it is a new message post or not
         {
             for (Profile userProfile : Server.getActiveUsers().values()) {
                 try {
@@ -618,6 +1062,7 @@ class TaskThread implements Runnable {
                     JsonObject messageJson = Json.createObjectBuilder()
                             .add("type", "ServerNotification")
                             .add("data-type", "message")
+                            .add("group", "Public")
                             .add("message-id", message.messageID)
                             .add("message-subject", message.subject)
                             .add("post-date", message.postDate)
@@ -662,6 +1107,18 @@ final class ListenThread implements Runnable {
     public ListenThread(Socket socket, BlockingQueue<Task> taskQueue) {
         this.socket = socket;
         this.taskQueue = taskQueue;
+        JsonObject welcomeJson = Json.createObjectBuilder()
+            .add("type", "ServerWelcome")
+            .add("action", "ServerWelcome")
+            .build();
+        Task welcomeTask = new Task(this.socket.hashCode(), welcomeJson);
+        try {
+            taskQueue.put(welcomeTask); // Blocks if the queue is full
+            logger.info("[Client " + socket.hashCode() + "] Task added to queue.");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt(); // Preserve the interrupt status
+            logger.warning("[Client " + socket.hashCode() + "] Interrupted while adding task to queue.");
+        }
     }
 
     @Override
@@ -704,7 +1161,19 @@ final class ListenThread implements Runnable {
             logger.severe("[Client " + socket.hashCode() + "] IOException in ClientListenerThread: " + e.getMessage());
         } finally {
             // Cleanup resources
-            try {
+                try {
+                    JsonObject removeJson = Json.createObjectBuilder()
+                        .add("type", "ServerRemove")
+                        .add("action", "ServerRemove")
+                        .build();
+                Task removeTask = new Task(this.socket.hashCode(), removeJson);
+                try {
+                    taskQueue.put(removeTask); // Blocks if the queue is full
+                    logger.info("[Client " + socket.hashCode() + "] Task added to queue.");
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt(); // Preserve the interrupt status
+                    logger.warning("[Client " + socket.hashCode() + "] Interrupted while adding task to queue.");
+                }
                 socket.close();
                 Server.removeUserProfile(this.socket.hashCode());
                 logger.info("[Client " + socket.hashCode() + "] Connection closed and user removed.");
