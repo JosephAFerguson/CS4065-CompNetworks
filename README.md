@@ -63,3 +63,6 @@ Data Types:
 
 * message
 {"type":"ServerAffirm", "data-type":"message", "message-id":123456, "sender":"ejr", "post-date": "11-20-2024 19:39", "message-subject": "This is the subject of the message", "data": "This is the body of the message", "receivedData": ...}
+
+## Major Issues
+* TODO
