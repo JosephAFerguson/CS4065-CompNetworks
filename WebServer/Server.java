@@ -784,7 +784,7 @@ class TaskThread implements Runnable {
                 }
                 int groupID = jsonObject.getInt("groupID");
 
-                if(groupID <5 && groupID >=0){
+                if(!(groupID <5 && groupID >=0)){
                     String errorMessage = "Invalid groupID provided";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
                     return;
@@ -890,7 +890,7 @@ class TaskThread implements Runnable {
                     return;
                 }
                 int groupID = jsonObject.getInt("groupID");
-                if(groupID <5 && groupID >=0){
+                if(!(groupID <5 && groupID >=0)){
                     String errorMessage = "Invalid groupID provided";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
                     return;
@@ -944,7 +944,7 @@ class TaskThread implements Runnable {
                     return;
                 }
                 int groupID = jsonObject.getInt("groupID");
-                if(groupID <5 && groupID >=0){
+                if(!(groupID <5 && groupID >=0)){
                     String errorMessage = "Invalid groupID provided";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
                     return;
@@ -984,7 +984,7 @@ class TaskThread implements Runnable {
                     return;
                 }
                 int groupID = jsonObject.getInt("groupID");
-                if(groupID <5 && groupID >=0){
+                if(!(groupID <5 && groupID >=0)){
                     String errorMessage = "Invalid groupID provided";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
                     return;
@@ -1026,7 +1026,7 @@ class TaskThread implements Runnable {
                     return;
                 }
                 int groupID = jsonObject.getInt("groupID");
-                if(groupID <5 && groupID >=0){
+                if(!(groupID <5 && groupID >=0)){
                     String errorMessage = "Invalid groupID provided";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
                     return;
@@ -1085,7 +1085,6 @@ class TaskThread implements Runnable {
         {
             //need notify users in a private group(s) about new message
             for(int groupID : whichPrivateGroups){
-
                 //inefficient, but we go through each user profile connected to the server,
                 //test if they are apart of the specific privateGroup, and try sending them the data if they are
                 for (Profile userProfile : Server.getActiveUsers().values()) {
