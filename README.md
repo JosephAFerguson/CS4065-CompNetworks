@@ -71,4 +71,6 @@ Data Types:
 {"type":"ServerAffirm", "data-type":"message", "message-id":123456, "sender":"ejr", "post-date": "11-20-2024 19:39", "message-subject": "This is the subject of the message", "data": "This is the body of the message", "receivedData": ...}
 
 ## Major Issues
-* TODO
+* Problem: Client could not accept commands and listen for responses from the server at the same time. Solution: Splitting the commands actions and the listening for response actions onto separate threads. This enabled the client to take in commands whilst also listening for the server responses and outputting them.
+* Problem: The client needs to output varying types of information. For example it needs to output text, lists(with titles), and messages. This caused one field in the JSON protocol to not be enough to properly output the information in a scalable way. Solution: Adding the data-type field. This allowed as to divide functionality based on the data-types. Only text, list, and message data types were needed and it allowed us to split the functionality and provide other fields based on the data-type. It also allowed us to output the data differently depending on the data-type.
+* Problem: Client input to Server was blocking as the .readline() method for the BufferedReader will block forever unless it sees a terminating newline character. Solution: Add the terminating newline character to each json message to the server.

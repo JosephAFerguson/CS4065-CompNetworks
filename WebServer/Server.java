@@ -1,5 +1,6 @@
-package com.example;
+package com.example;//what the maven project calls this to run the file
 
+//All packages needed for socket communication
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -8,25 +9,34 @@ import java.io.OutputStreamWriter;
 import java.io.StringReader;
 import java.net.ServerSocket;
 import java.net.Socket;
+
+//time package
 import java.time.LocalDate;
+
+//data structures we use for our data storage
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
+
+//logging package
 import java.util.logging.Logger;
 
+//json packages
 import javax.json.Json;
 import javax.json.JsonArrayBuilder;
 import javax.json.JsonException;
 import javax.json.JsonObject;
 import javax.json.JsonReader;
 
+//Class for the program constants, only used for the messageboard and inherited private message board class
 final class CONSTANTS {
     public final static int MAX_USERS = 100;
     public final static int MAX_MESSAGES = 1000;
 }
 
+//Class to store information related to a message, and all the attributes for one.
 final class Message {
     int messageID;
     String sender;
@@ -35,6 +45,7 @@ final class Message {
     String content;
 }
 
+//Class for the public message board 
 class MessageBoard {
     private HashMap<Integer, Message> messages;
     private Message[] messagesByDate;
@@ -42,6 +53,7 @@ class MessageBoard {
     private int userInd;
     private int messageInd;
 
+    //Constructor to create the arrays and hashmap to hold the messages and users
     public MessageBoard() {
         messages = new HashMap<>();
         messagesByDate = new Message[CONSTANTS.MAX_MESSAGES];
@@ -50,6 +62,8 @@ class MessageBoard {
         messageInd = 0;
     }
 
+    /*getters and setters - cont.
+    */
     public synchronized int getMessageID() {
         return messageInd;
     }
@@ -64,12 +78,13 @@ class MessageBoard {
     }
 
     public synchronized String[] getAllUsers() {
+        //here we make a copy of all the users from our user array, to a new array of length to hold only the used-memory part of the array
         String[] returnUsers = new String[userInd+1];
         for (int i= 0;i< userInd+1;i++)
         {
             returnUsers[i] = users[i];
         }
-        return returnUsers;
+        return returnUsers;//nulls will be checked on the other side anyway
     }
 
     public synchronized void addUser(String username) {
@@ -84,7 +99,7 @@ class MessageBoard {
     public synchronized void removeUser(String username) {
         for (int i = 0; i < userInd; i++) {
             if (users[i].equals(username)) {
-                // Shift elements to the left
+                // Shift elements to the left to remove the user at that index
                 for (int j = i; j < userInd - 1; j++) {
                     users[j] = users[j + 1];
                 }
@@ -105,7 +120,7 @@ class MessageBoard {
             System.out.println("Max message limit reached. Cannot add more messages.");
         }
     }
-
+    //returns the last 2 messages, if there aren't any, return null ones
     public synchronized Message[] getLast2() {
         Message[] retMessages = new Message[2];
         if (messageInd >= 2) {
@@ -128,6 +143,7 @@ class MessageBoard {
         return messages.get(id);
     }
 
+    //this is not used currently, was not specified in project description
     public synchronized void deleteMessage(int id) {
         if (!messages.containsKey(id)) {
             System.out.println("Message ID not found.");
@@ -138,8 +154,8 @@ class MessageBoard {
             if (messagesByDate[i].messageID == id) {
                 for (int j = i; j < messageInd - 1; j++) {
                     messagesByDate[j] = messagesByDate[j + 1];
-                }
-                messagesByDate[messageInd - 1] = null;
+                }//shift left like in remove user
+                messagesByDate[messageInd - 1] = null;//set last index to null
                 messageInd--;
                 break;
             }
@@ -147,8 +163,9 @@ class MessageBoard {
     }
 }
 
+//Class for the inherited private message board
 final class PrivateMessageBoard extends MessageBoard {
-    private int groupID;
+    private int groupID;//only change is that we have a groupID and groupName
     private String groupName;
 
     public PrivateMessageBoard(Integer groupID, String groupName){
@@ -156,6 +173,7 @@ final class PrivateMessageBoard extends MessageBoard {
         this.groupID = groupID;
         this.groupName = groupName;
     }
+    //getters and setters - cont.
     public Integer getGroupId(){
         return groupID;
     }
@@ -163,6 +181,8 @@ final class PrivateMessageBoard extends MessageBoard {
         return groupName;
     }
 }
+
+//Class for the tasks, that the task thread will process, needs to store the hashcode of the connected client socket, for in/out streams
 final class Task {
     private int clientSocketHash;
     private JsonObject request;
@@ -171,7 +191,7 @@ final class Task {
         this.clientSocketHash = clientSocketHash;
         this.request = request;
     }
-
+    //getters and setters - cont.
     public int getClientSocketHash() {
         return clientSocketHash;
     }
@@ -181,6 +201,8 @@ final class Task {
     }
 }
 
+//Class for the Profile of the user/connected client, needs to be maintained at server level,
+//not thread level as in/out streams need to be kept open at all times (they will close the whole connection if not)
 final class Profile {
     private Socket socket;
     private BufferedReader in;
@@ -198,6 +220,7 @@ final class Profile {
         }
     }
 
+    //getters and setters cont.
     public BufferedReader getIn() {
         return in;
     }
@@ -223,8 +246,11 @@ final class Profile {
     }
 }
 
+//Server/Main class for the file to run, maintains all connections and accepts new ones
 public final class Server {
+    //Maintain the connections/Profiles for each connected socket, the id mapping the relation is the hashcode
     private static ConcurrentHashMap<Integer, Profile> activeUsers = new ConcurrentHashMap<>();
+    //Maintain the queue for the task thread, this is a blocking one needed for multithreading
     private static BlockingQueue<Task> taskQueue = new LinkedBlockingQueue<>();
 
     public static void main(String[] argv) throws Exception {
@@ -238,9 +264,10 @@ public final class Server {
         privateGroups[3] = new PrivateMessageBoard(3, "Blue Collars");
         privateGroups[4] = new PrivateMessageBoard(4, "Retirees");
 
+        //port this will be hosted on
         int port = 6789;
 
-        // The thread will will send all notifications and process requests
+        // The thread will process all tasks, i.e send all notifications and process requests
         Thread taskThread = new Thread(new TaskThread(taskQueue, messageBoard, privateGroups));
         taskThread.start();
 
@@ -289,18 +316,22 @@ public final class Server {
     }
 }
 
+
 class TaskThread implements Runnable {
     private BlockingQueue<Task> taskQueue;
+    //logger for better output on what this thread is acchomplishing
     private static final Logger logger = Logger.getLogger(TaskThread.class.getName());
     private MessageBoard messageBoard;
     private PrivateMessageBoard[] privateGroups;
 
+    //Constructor, basically we set all of our data structures to what the server gives us - THIS IS SHARED DATA
     public TaskThread(BlockingQueue<Task> taskQueue, MessageBoard messageBoard, PrivateMessageBoard[] privateGroups) {
         this.taskQueue = taskQueue;
         this.messageBoard = messageBoard;
         this.privateGroups = privateGroups;
     }
 
+    //The running functionality of the thread
     @Override
     public void run() {
         try {
@@ -322,6 +353,7 @@ class TaskThread implements Runnable {
         }
     }
 
+    //Send a json response regarding an error that occured in the received json package,a server deny with the error message
     private void sendErrorJsonResponse(BufferedWriter out, JsonObject jsonObject, String error) throws IOException {
         logger.info("JSON Error: " + error);
         // violates protocol
@@ -348,11 +380,15 @@ class TaskThread implements Runnable {
     }
 
     private void processTask(Task task) throws IOException {
-        // Our objects to work with
+        // Get the hashcode (hc) associated with this task
         Integer hc = task.getClientSocketHash();
+
+        //check if the user is still connected - cannot perform operations for a disconnected user
         if (!Server.isUserActive(hc)) {
             return;
         }
+
+        //get the output streams and json package associated with the User/profile
         Profile User = Server.getUserProfile(hc);
         BufferedWriter out = User.getOut();
         JsonObject jsonObject = task.getJsonObject();
@@ -374,12 +410,14 @@ class TaskThread implements Runnable {
             sendErrorJsonResponse(out, jsonObject, "Request missing key 'action'");
             return;
         }
+
+        //Get the username, and provided arguments for type and action
         String username = User.getUserName();
         String type = jsonObject.getString("type");
         String action = jsonObject.getString("action");
 
         //Welcome user to server and prompt for username
-        if ("ServerWelcome".equals(type)){
+        if ("ServerWelcome".equals(type)){ //this is server side only, client will not provide this, this is in case of a disconnect
             logger.info("Welcoming new user to server, providing help and start commands");
 
             JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();
@@ -393,10 +431,10 @@ class TaskThread implements Runnable {
                     .add("data", arrayBuilder)
                     .add("receivedData", jsonObject)
                     .build();
+            //send the welcome message
             sendJsonResponse(out, responseJson);
 
-            //User is requesting groups in which he can join
-            //privateGroups
+            //Show user private groups
             JsonArrayBuilder arrayBuilder2 = Json.createArrayBuilder();
 
             // Add each group to the JSON array
@@ -414,12 +452,13 @@ class TaskThread implements Runnable {
                     .add("receivedData", jsonObject)
                     .build();
 
+            //send the json with the private groups 
             sendJsonResponse(out, responseJson2);
             return;
 
         // Handling all clientRequest requests
         // One can observe that each action will match a Client possible option
-        } else if ("ServerRemove".equals(type)) {
+        } else if ("ServerRemove".equals(type)) {//this is server side only, client will not provide this 
             // Notify all users //This needs to be done before we remove the user
             Message blankM = new Message();
             notifyAllUsers(false, blankM, username + " has left the message board");
@@ -431,7 +470,9 @@ class TaskThread implements Runnable {
                     whichGroupsUserIn.add(i);
                 }
             }
+            //notify the private groups as well
             notifyAllPrivateUsers(whichGroupsUserIn, false, blankM, username + " has left the private message board: ");
+            
             // Remove the user from the private message groups and the public message board and nullify the socket's username
             // profile
             for(int i = 0; i<5;i++){
@@ -440,8 +481,7 @@ class TaskThread implements Runnable {
             messageBoard.removeUser(username);
             User.setUsername(null);
             return;//no serveraffirm as user disconnected
-        } else if ("clientRequest".equals(type)) {
-
+        } else if ("clientRequest".equals(type)) {//all client requests / commands will be processed here
             if ("help".equals(action)){
                 //provide list of commands
                 JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();
@@ -478,15 +518,16 @@ class TaskThread implements Runnable {
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
                     return;
                 }
-
+                //user provided a username
                 username = jsonObject.getString("username");
                 User.setUsername(username);
                 // Checking if the user already exists.
                 // If they don't, add the user.
                 // Otherwise, throw an error
                 if (!messageBoard.getUser(username)) {
-                    messageBoard.addUser(username);
 
+                    messageBoard.addUser(username);
+                    //this will be sent over
                     responseJson = Json.createObjectBuilder()
                             .add("type", "ServerAffirm")
                             .add("data-type", "text")
@@ -506,6 +547,8 @@ class TaskThread implements Runnable {
                  */
                 Message blankM = new Message();
                 notifyAllUsers(false, blankM , username + " has entered the message board");
+                
+                //get last 2 messages to show user
                 Message[] last2 = messageBoard.getLast2();
                 
                 if(last2[0] != null){
@@ -537,6 +580,7 @@ class TaskThread implements Runnable {
                     sendJsonResponse(User.getOut(), messageJson2);
                 }
 
+                //get all users for the new client
                 String[] allUsers = messageBoard.getAllUsers();
 
                 // Convert String[] to JsonArray using JsonArrayBuilder
@@ -593,9 +637,14 @@ class TaskThread implements Runnable {
                 for(int i = 0; i<5;i++){
                     privateGroups[i].removeUser(username);
                 }
+                // Remove user
                 messageBoard.removeUser(username);
                 User.setUsername(null);
             } else if ("postMessage".equals(action)) {// Handles post Message request
+                /* From now on all the commands(so to say) 
+                 * will have the same checks/testing for valid json input
+                 * only necessary comments will be provided
+                 */
                 if (!jsonObject.containsKey("messageContent") || !jsonObject.containsKey("messageSubject")) {
                     String errorMessage = "In order to post a public message you must include messageContent and messageSubject";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
@@ -611,6 +660,8 @@ class TaskThread implements Runnable {
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
                     return;
                 }
+
+                //Make the actual message
                 int messageID = messageBoard.getMessageID();
                 Message message = new Message();
                 message.content = messageContent;
@@ -632,6 +683,7 @@ class TaskThread implements Runnable {
                  */
                 notifyAllUsers(true, message, username + " posted: " + messageContent);// needs to be changed
             } else if ("getMessage".equals(action)) {// handles a get Message with message ID request
+                //checks as always
                 if (username.equals(null)) {
                     String errorMessage = "To get a message the user must be in the public group, try performing the join first";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
@@ -642,6 +694,7 @@ class TaskThread implements Runnable {
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
                     return;
                 }
+                //check if the message exists
                 int messageID = jsonObject.getInt("messageID");
                 Message message = new Message();
                 if (messageBoard.tryMessageID(messageID)) {
@@ -651,6 +704,7 @@ class TaskThread implements Runnable {
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
                     return;
                 }
+                //send the message back
                 responseJson = Json.createObjectBuilder()
                         .add("type", "ServerAffirm")
                         .add("data-type", "message")
@@ -665,17 +719,19 @@ class TaskThread implements Runnable {
                 sendJsonResponse(out, responseJson);
                 return;
             } else if ("getUsers".equals(action)) {
+                //checks as always
                 if (username.equals(null)) {
                     String errorMessage = "To get a list of users the user must be in the public group, try performing the join first";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
                     return;
                 }
+                //get all the users
                 String[] users = messageBoard.getAllUsers();
                 JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();
 
                 // Add each user to the JSON array
                 for (String user : users) {
-                    if (user == null) {
+                    if (user == null) {//check for nulls
                         break;
                     }
                     arrayBuilder.add(user);
@@ -797,6 +853,7 @@ class TaskThread implements Runnable {
                     sendJsonResponse(User.getOut(), messageJson2);
                 }
 
+                //notify private group client joined of join
                 String[] allUsers = privateGroups[groupID].getAllUsers();
 
                 // Convert String[] to JsonArray using JsonArrayBuilder
@@ -807,7 +864,7 @@ class TaskThread implements Runnable {
                     }
                     arrayBuilder.add(user);
                 }
-
+                //send the information back
                 JsonObject usersJson = Json.createObjectBuilder()
                     .add("type", "ServerNotification")
                     .add("data-type", "list")
@@ -818,6 +875,7 @@ class TaskThread implements Runnable {
                 return;
 
             } else if ("groupPostMessage".equals(action)){
+                //checks as usual
                 if (!jsonObject.containsKey("messageContent") || !jsonObject.containsKey("messageSubject") || !jsonObject.containsKey("groupID")) {
                     String errorMessage = "In order to post a private group message you must include the groupID, messageContent, and messageSubject";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
@@ -833,6 +891,7 @@ class TaskThread implements Runnable {
                     String errorMessage = "In order to post a private group message you must be in the private group first.";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
                 }
+                //get the message params
                 String messageContent = jsonObject.getString("messageContent");
                 String messageSubject = jsonObject.getString("messageSubject");
                 int messageID = messageBoard.getMessageID();
@@ -843,6 +902,7 @@ class TaskThread implements Runnable {
                 message.postDate = LocalDate.now().toString();
                 message.sender = username;
 
+                //add the message and send affirm
                 privateGroups[groupID].addMessage(messageID, message);
                 responseJson = Json.createObjectBuilder()
                         .add("type", "ServerAffirm")
@@ -855,11 +915,11 @@ class TaskThread implements Runnable {
                  * message
                  */
                 ArrayList<Integer> pgs = new ArrayList<Integer>();
-                pgs.add(groupID);
+                pgs.add(groupID);//add the group message was posted in
                 notifyAllPrivateUsers(pgs, true, message, username + " posted: " + messageContent);// needs to be changed
-    
                 return;
             } else if ("getGroupUsers".equals(action)){
+                //checks as usual
                 if (username.equals(null)) {
                     String errorMessage = "To get a list of private group users the user must be in the public group, try performing the join first";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
@@ -894,6 +954,7 @@ class TaskThread implements Runnable {
                 return;
 
             } else if ("groupLeave".equals(action)){
+                //checks as usual
                 if (username.equals(null)) {
                     String errorMessage = "To leave a private group you must first be in the public group and in a private group";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
@@ -912,6 +973,7 @@ class TaskThread implements Runnable {
                     return;
                 }
                 
+                //make the private group int array to pass to the notify all private users function
                 ArrayList<Integer> pgs = new ArrayList<Integer>();
                 pgs.add(groupID);
                 Message blankM = new Message();
@@ -929,6 +991,7 @@ class TaskThread implements Runnable {
                 sendJsonResponse(out, responseJson);
                 return;
             } else if ("getGroupMessage".equals(action)){
+                //checks as usual
                 if (username.equals(null)) {
                     String errorMessage = "To get a list of private group users the user must be in the public group, try performing the join first";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
@@ -946,6 +1009,7 @@ class TaskThread implements Runnable {
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
                     return;
                 }
+                //get the message from the private board and send response
                 int messageID = jsonObject.getInt("messageID");
 
                 Message message = new Message();
@@ -987,7 +1051,7 @@ class TaskThread implements Runnable {
             sendErrorJsonResponse(out, jsonObject, errorMessage);
             return;
         }
-        sendJsonResponse(out, responseJson);
+        sendJsonResponse(out, responseJson);//last case in which there is a forgotten return statement to send the affirm
     }
     private void notifyAllPrivateUsers(ArrayList<Integer> whichPrivateGroups, Boolean M, Message message, String notificationMessage){
         if(M) //if it is a new message or not
@@ -1056,6 +1120,7 @@ class TaskThread implements Runnable {
     private void notifyAllUsers(Boolean M, Message message, String notificationMessage) {
         if(M) // If it is a new message post or not
         {
+            //go through all active users and send them the notification
             for (Profile userProfile : Server.getActiveUsers().values()) {
                 try {
                     BufferedWriter clientOut = userProfile.getOut();
@@ -1098,6 +1163,8 @@ class TaskThread implements Runnable {
     }
 }
 
+//class for the one - to many(depending on number of clients) threads listening to a client endlessly
+//puts "tasks" on the task queue for the task thread to do
 final class ListenThread implements Runnable {
     private static final Logger logger = Logger.getLogger(ListenThread.class.getName());
     private Socket socket;
@@ -1107,10 +1174,12 @@ final class ListenThread implements Runnable {
     public ListenThread(Socket socket, BlockingQueue<Task> taskQueue) {
         this.socket = socket;
         this.taskQueue = taskQueue;
+        //user is connected, add a task to welcome them
         JsonObject welcomeJson = Json.createObjectBuilder()
             .add("type", "ServerWelcome")
             .add("action", "ServerWelcome")
             .build();
+        //try to add to the task queue
         Task welcomeTask = new Task(this.socket.hashCode(), welcomeJson);
         try {
             taskQueue.put(welcomeTask); // Blocks if the queue is full
@@ -1121,20 +1190,23 @@ final class ListenThread implements Runnable {
         }
     }
 
+    //the listening functionality for the thread
     @Override
     public void run() {
         try {
+            //get the input stream
             BufferedReader in = Server.getUserProfile(this.socket.hashCode()).getIn();
 
-            while (!Thread.currentThread().isInterrupted()) {
-                String clientRequest = in.readLine();
+            while (!Thread.currentThread().isInterrupted()) {//while this thread can run, run
+                
+                String clientRequest = in.readLine();//listen for input and get it
 
                 // Break the loop if the stream is closed or null data is received
                 if (clientRequest == null) {
                     logger.info("[Client " + socket.hashCode() + "] Connection closed by client.");
                     break;
                 }
-
+                //read the json 
                 JsonObject jsonObject = null;
                 try (JsonReader jsonReader = Json.createReader(new StringReader(clientRequest))) {
                     jsonObject = jsonReader.readObject();
@@ -1166,6 +1238,7 @@ final class ListenThread implements Runnable {
                         .add("type", "ServerRemove")
                         .add("action", "ServerRemove")
                         .build();
+                //send a task to the task thread to remove the user from the public/private groups client was in
                 Task removeTask = new Task(this.socket.hashCode(), removeJson);
                 try {
                     taskQueue.put(removeTask); // Blocks if the queue is full
@@ -1174,8 +1247,8 @@ final class ListenThread implements Runnable {
                     Thread.currentThread().interrupt(); // Preserve the interrupt status
                     logger.warning("[Client " + socket.hashCode() + "] Interrupted while adding task to queue.");
                 }
-                socket.close();
-                Server.removeUserProfile(this.socket.hashCode());
+                socket.close();//closes everything as well
+                Server.removeUserProfile(this.socket.hashCode());//removes from the server
                 logger.info("[Client " + socket.hashCode() + "] Connection closed and user removed.");
             } catch (IOException e) {
                 logger.warning("[Client " + socket.hashCode() + "] Error closing socket: " + e.getMessage());
