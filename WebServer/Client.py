@@ -278,6 +278,8 @@ class ClientGUI:
         Sends the user's message to the server and updates the display.
     start_receiving():
         Starts a thread to continuously listen for messages from the server.
+    quit():
+        Quits the GUI and closes it.
     """
     def __init__(self, root, client: Client):
         self.root = root
@@ -337,6 +339,7 @@ class ClientGUI:
         threading.Thread(target=receive_loop, daemon=True).start()
 
     def quit(self):
+        """Quits the GUI and closes it."""
         self.client.close()
         print("Closing the GUI")
         self.root.destroy()

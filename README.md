@@ -4,9 +4,19 @@ Project 2 - A Simple Bulletin Board Using Socket Programming
 Instructor: Giovani Abuaitah
 
 ## Message Board Commands:
-* join = Connect to server
-* exit = Close the connection to the server
-* viewBoard = View the last 2 messages that were posted
+* connect = Connect to server at localhost:6789.
+* join [username] = Connect to public server with username as [username].
+* post [subject] [content...] = Post a message to the public message board with the subject specified as [subject] and the content(which can include spaces) as [content...].
+* users = Get a list of the users on the public message board.
+* leave = Leave the public message board.
+* message [messageID] = Gets the message content for the message with the id [messageID].
+* exit = Close the connection to the server at localhost:6789.
+* groups = Gets a list of all of the private groups that can be joined.
+* groupjoin [groupID] = Joins the group of the specified [groupID].
+* grouppost [groupID] [subject] [content...] = Posts the message with [subject] as the subject and [content...] as the content (which can contain spaces) into the private message group with id [groupID].
+* groupusers [groupID] = Gets the list of users for the private group of id [groupID].
+* groupleave [groupID] = Leaves the private group of id [groupID].
+* groupmessage [groupID] [messageID] = In private group with id [groupID] it gets the content of the message with private message id of [messageID].
 
 ## Notes: 
 tkinter needs installed for python
@@ -35,15 +45,16 @@ Add the following inside the pom.xml found in /demo:
 
 
 ## JSON Structure
-Client -> Server:
 {
     "type": The type of the request. I.e. "clientRequest",
-    "action": The action to be performed on the server. I.e. "join", "viewBoard",
-    
+    "data-type": The type of the data being sent. I.e. "text", "list", "message".
+    "data": The data of the messsage. This could represent different things based on the data-type. 
+    I.e. text for text, list for list, message content for message.
+    ...
+    There are also data-type specific fields which are highlighted below.
 }
 
-
-Server Data Types:
+Data Types:
 * text
 {"type":"ServerAffirm", "data-type":"text", "data":"alskfjalksdfj  aslkfasldfj asldfj alskdjf alksdfjaklsjfalkdfa", "receivedData": ...}
 
