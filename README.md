@@ -1,25 +1,12 @@
-# CS4065-CompNetworks
+## CS4065-CompNetworks
 CS4065 Computer Networks and Networked Computing
 Project 2 - A Simple Bulletin Board Using Socket Programming
 Instructor: Giovani Abuaitah
 
-## Message Board Commands:
-* help = Explains what the available commands do.
-* connect = Connect to server at localhost:6789.
-* join [username] = Connect to public server with username as [username].
-* post [subject] [content...] = Post a message to the public message board with the subject specified as [subject] and the content(which can include spaces) as [content...].
-* users = Get a list of the users on the public message board.
-* leave = Leave the public message board.
-* message [messageID] = Gets the message content for the message with the id [messageID].
-* exit = Close the connection to the server at localhost:6789.
-* groups = Gets a list of all of the private groups that can be joined.
-* groupjoin [groupID] = Joins the group of the specified [groupID].
-* grouppost [groupID] [subject] [content...] = Posts the message with [subject] as the subject and [content...] as the content (which can contain spaces) into the private message group with id [groupID].
-* groupusers [groupID] = Gets the list of users for the private group of id [groupID].
-* groupleave [groupID] = Leaves the private group of id [groupID].
-* groupmessage [groupID] [messageID] = In private group with id [groupID] it gets the content of the message with private message id of [messageID].
+## Team Members:
+Joe Ferguson, Eli Rindler, Braden Monnin
 
-## Notes: 
+## How to Compile and Run:
 tkinter needs installed for python. If you have python 3.7 or later this is already installed. If need to install tkinter
 the command pip install tk can be used.
 
@@ -27,6 +14,7 @@ We used vscode as the editor for this. The extension pack: "Extension Pack for J
 In the same directory as the client.py file, create a maven project, it will ask for 2 things and provide default values, just hit enter for each of the default values.
 Navigate to the new /demo/src/main/java~ and edit the main.java(you can rename it) to contain the code from this repository.
 Add the following inside the pom.xml found in /demo:
+
 <dependencies>
     <!-- javax.json dependency -->
     <dependency>
@@ -50,6 +38,24 @@ To compile and run the server, if using vscode on the Java file inside of the ma
 compile and run the server code.
 
 To run the python code Client.py can be open and the run button can be clicked. To do this by the terminal, python WebServer/Client.py can be used.
+
+
+## Message Board Commands:
+* help = Explains what the available commands do.
+* connect = Connect to server at localhost:6789.
+* join [username] = Connect to public server with username as [username].
+* post [subject] [content...] = Post a message to the public message board with the subject specified as [subject] and the content(which can include spaces) as [content...].
+* users = Get a list of the users on the public message board.
+* leave = Leave the public message board.
+* message [messageID] = Gets the message content for the message with the id [messageID].
+* exit = Close the connection to the server at localhost:6789.
+* groups = Gets a list of all of the private groups that can be joined.
+* groupjoin [groupID] = Joins the group of the specified [groupID].
+* grouppost [groupID] [subject] [content...] = Posts the message with [subject] as the subject and [content...] as the content (which can contain spaces) into the private message group with id [groupID].
+* groupusers [groupID] = Gets the list of users for the private group of id [groupID].
+* groupleave [groupID] = Leaves the private group of id [groupID].
+* groupmessage [groupID] [messageID] = In private group with id [groupID] it gets the content of the message with private message id of [messageID].
+
 
 ## JSON Structure
 {
