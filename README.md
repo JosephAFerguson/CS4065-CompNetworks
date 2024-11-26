@@ -19,7 +19,9 @@ Instructor: Giovani Abuaitah
 * groupmessage [groupID] [messageID] = In private group with id [groupID] it gets the content of the message with private message id of [messageID].
 
 ## Notes: 
-tkinter needs installed for python
+tkinter needs installed for python. If you have python 3.7 or later this is already installed. If need to install tkinter
+the command pip install tk can be used.
+
 We used vscode as the editor for this. The extension pack: "Extension Pack for Java v0.29.0" needs installed in vscode.
 In the same directory as the client.py file, create a maven project, it will ask for 2 things and provide default values, just hit enter for each of the default values.
 Navigate to the new /demo/src/main/java~ and edit the main.java(you can rename it) to contain the code from this repository.
@@ -43,6 +45,10 @@ Add the following inside the pom.xml found in /demo:
     <!-- You can include other dependencies as needed -->
 </dependencies>
 
+To compile and run the server, if using vscode on the Java file inside of the maven project the run button can be clicked to 
+compile and run the server code.
+
+To run the python code Client.py can be open and the run button can be clicked. To do this by the terminal, python WebServer/Client.py can be used.
 
 ## JSON Structure
 {
