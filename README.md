@@ -4,6 +4,7 @@ Project 2 - A Simple Bulletin Board Using Socket Programming
 Instructor: Giovani Abuaitah
 
 ## Message Board Commands:
+* help = Explains what the available commands do.
 * connect = Connect to server at localhost:6789.
 * join [username] = Connect to public server with username as [username].
 * post [subject] [content...] = Post a message to the public message board with the subject specified as [subject] and the content(which can include spaces) as [content...].
