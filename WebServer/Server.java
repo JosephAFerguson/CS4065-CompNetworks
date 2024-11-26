@@ -346,6 +346,8 @@ class TaskThread implements Runnable {
 
                 } catch (IOException e) {
                     logger.warning("Failed to send notification: " + e.getMessage());
+                } catch (Exception e){
+                    logger.severe("UNIDENTIFIED EXCEPTION OCCURRED, MOVING TO OTHER TASK" + e.getMessage());
                 }
             }
         } catch (InterruptedException e) {
@@ -782,6 +784,12 @@ class TaskThread implements Runnable {
                 }
                 int groupID = jsonObject.getInt("groupID");
 
+                if(groupID <5 && groupID >=0){
+                    String errorMessage = "Invalid groupID provided";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
+
                 //Handle case upon user not having username yet
                 if (username==null) {
                     String errorMessage = "You must join the public group and have a username prior to joining a private group";
@@ -882,6 +890,11 @@ class TaskThread implements Runnable {
                     return;
                 }
                 int groupID = jsonObject.getInt("groupID");
+                if(groupID <5 && groupID >=0){
+                    String errorMessage = "Invalid groupID provided";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
                 if (username.equals(null)){
                     String errorMessage = "In order to post a private group message you must be in the public group first.";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
@@ -931,6 +944,11 @@ class TaskThread implements Runnable {
                     return;
                 }
                 int groupID = jsonObject.getInt("groupID");
+                if(groupID <5 && groupID >=0){
+                    String errorMessage = "Invalid groupID provided";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
                 String[] users = privateGroups[groupID].getAllUsers();
                 JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();
 
@@ -966,6 +984,11 @@ class TaskThread implements Runnable {
                     return;
                 }
                 int groupID = jsonObject.getInt("groupID");
+                if(groupID <5 && groupID >=0){
+                    String errorMessage = "Invalid groupID provided";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
 
                 if(!privateGroups[groupID].getUser(username)){
                     String errorMessage = "To leave a private group you must be in the private group first.";
@@ -1003,7 +1026,11 @@ class TaskThread implements Runnable {
                     return;
                 }
                 int groupID = jsonObject.getInt("groupID");
-
+                if(groupID <5 && groupID >=0){
+                    String errorMessage = "Invalid groupID provided";
+                    sendErrorJsonResponse(out, jsonObject, errorMessage);
+                    return;
+                }
                 if(!privateGroups[groupID].getUser(username)){
                     String errorMessage = "To get a message from a private group you must be in the private group first.";
                     sendErrorJsonResponse(out, jsonObject, errorMessage);
