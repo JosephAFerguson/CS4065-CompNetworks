@@ -25,26 +25,9 @@ the command pip install tk can be used.
 
 We used vscode as the editor for this. The extension pack: "Extension Pack for Java v0.29.0" needs installed in vscode.
 In the same directory as the client.py file, create a maven project, it will ask for 2 things and provide default values, just hit enter for each of the default values.
+
 Navigate to the new /demo/src/main/java~ and edit the main.java(you can rename it) to contain the code from this repository.
-Add the following inside the pom.xml found in /demo:
-<dependencies>
-    <!-- javax.json dependency -->
-    <dependency>
-        <groupId>javax.json</groupId>
-        <artifactId>javax.json-api</artifactId>
-        <version>1.1.4</version>  <!-- Or any newer version -->
-    </dependency>
-
-    <!-- Implementation for javax.json -->
-    <dependency>
-        <groupId>org.glassfish</groupId>
-        <artifactId>javax.json</artifactId>
-        <version>1.1.4</version> <!-- Or any newer version -->
-    </dependency>
-
-    <!-- For logging or other dependencies -->
-    <!-- You can include other dependencies as needed -->
-</dependencies>
+Add the the code of our supplied pom.xml inside the pom.xml found in /demo.
 
 To compile and run the server, if using vscode on the Java file inside of the maven project the run button can be clicked to 
 compile and run the server code.
