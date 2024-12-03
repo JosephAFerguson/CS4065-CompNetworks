@@ -290,6 +290,10 @@ class ClientGUI:
         self.text_area = scrolledtext.ScrolledText(root, wrap=tk.WORD, state='disabled', width=50, height=20)
         self.text_area.grid(row=0, column=0, columnspan=2, padx=10, pady=10)
 
+        # Create a scrollable text area to display notifications
+        self.text_area2 = scrolledtext.ScrolledText(root, wrap=tk.WORD, state='disabled', width=50, height=20)
+        self.text_area2.grid(row=0, column=2, columnspan=2, padx=10, pady=10)
+
         # Entry box for user input
         self.input_box = tk.Entry(root, width=40)
         self.input_box.grid(row=1, column=0, padx=10, pady=10)
@@ -304,10 +308,16 @@ class ClientGUI:
 
     def display_message(self, message):
         """Display a message in the text area."""
-        self.text_area.config(state='normal')
-        self.text_area.insert(tk.END, f"{message}\n")
-        self.text_area.yview(tk.END)  # Auto-scroll to the end
-        self.text_area.config(state='disabled')
+        if "Server (Notification)" in message:
+            self.text_area2.config(state='normal')
+            self.text_area2.insert(tk.END, f"{message}\n")
+            self.text_area2.yview(tk.END)  # Auto-scroll to the end
+            self.text_area2.config(state='disabled')
+        else:
+            self.text_area.config(state='normal')
+            self.text_area.insert(tk.END, f"{message}\n")
+            self.text_area.yview(tk.END)  # Auto-scroll to the end
+            self.text_area.config(state='disabled')
 
     def send_message(self, event=None):
         """Send a message to the server."""
