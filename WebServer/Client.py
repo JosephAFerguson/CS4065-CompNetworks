@@ -260,7 +260,7 @@ class ClientGUI:
     """
     A class to represent the graphical user interface for a client in a message board application.
 
-    This class provides the GUI for intereacting with the server via the client messaging system.
+    This class provides the GUI for interacting with the server via the client messaging system.
     It allows the user to send commands and get the responses from the server and display them.
 
     Attributes:
@@ -272,8 +272,10 @@ class ClientGUI:
 
     Methods:
     -------
-    display_message(message):
-        Appends a message to the board and updates the display.
+    display_message(message, color):
+        Appends a message to the main board and updates the display with a color.
+    display_server_message(message, color):
+        Appends a message to the server response box and updates the display with a color.
     send_message(event=None):
         Sends the user's message to the server and updates the display.
     start_receiving():
@@ -286,36 +288,59 @@ class ClientGUI:
         self.client = client
         self.root.title("localhost:6789 Bulletin Board")
 
-        # Create a scrollable text area to display messages
-        self.text_area = scrolledtext.ScrolledText(root, wrap=tk.WORD, state='disabled', width=50, height=20)
-        self.text_area.grid(row=0, column=0, columnspan=2, padx=10, pady=10)
+        # Labels for user and server text areas
+        self.user_label = tk.Label(root, text="User Commands & Output", font=("Arial", 12, "bold"))
+        self.user_label.grid(row=0, column=0, padx=10, pady=5)
+
+        self.server_label = tk.Label(root, text="Server Messages", font=("Arial", 12, "bold"))
+        self.server_label.grid(row=0, column=1, padx=10, pady=5)
+
+        # Main text area for user interaction
+        self.text_area = scrolledtext.ScrolledText(
+            root, wrap=tk.WORD, state='disabled', width=40, height=20, bg="#f0f0f0"
+        )
+        self.text_area.grid(row=1, column=0, padx=10, pady=5)
+
+        # Additional text area for server messages
+        self.server_text_area = scrolledtext.ScrolledText(
+            root, wrap=tk.WORD, state='disabled', width=40, height=20, bg="#e8f7fc"
+        )
+        self.server_text_area.grid(row=1, column=1, padx=10, pady=5)
 
         # Entry box for user input
-        self.input_box = tk.Entry(root, width=40)
-        self.input_box.grid(row=1, column=0, padx=10, pady=10)
+        self.input_box = tk.Entry(root, width=55)
+        self.input_box.grid(row=2, column=0, columnspan=1, padx=10, pady=10)
         self.input_box.bind("<Return>", self.send_message)
 
         # Send button
-        self.send_button = tk.Button(root, text="Send", command=self.send_message)
-        self.send_button.grid(row=1, column=1, padx=10, pady=10)
+        self.send_button = tk.Button(root, text="Send", command=self.send_message, bg="#d1e7dd", font=("Arial", 10))
+        self.send_button.grid(row=2, column=1, padx=10, pady=10)
 
         # Display Start Message
-        self.display_message("Welcome: Enter connect to get started!")
+        self.display_message("Welcome: Enter 'connect' to get started!", color="blue")
 
-    def display_message(self, message):
-        """Display a message in the text area."""
+    def display_message(self, message, color="black"):
+        """Display a message in the main text area with a specific color."""
         self.text_area.config(state='normal')
-        self.text_area.insert(tk.END, f"{message}\n")
+        self.text_area.insert(tk.END, f"{message}\n", ("color",))
+        self.text_area.tag_configure("color", foreground=color)
         self.text_area.yview(tk.END)  # Auto-scroll to the end
         self.text_area.config(state='disabled')
+
+    def display_server_message(self, message, color="green"):
+        """Display a message in the server response text area with a specific color."""
+        self.server_text_area.config(state='normal')
+        self.server_text_area.insert(tk.END, f"{message}\n", ("color",))
+        self.server_text_area.tag_configure("color", foreground=color)
+        self.server_text_area.yview(tk.END)  # Auto-scroll to the end
+        self.server_text_area.config(state='disabled')
 
     def send_message(self, event=None):
         """Send a message to the server."""
         message = self.input_box.get()
         if message:
-            # Call your existing send_message function here
-            # send_message(message)
-            self.display_message(f"You: {message}")  # Display your own message
+            # Display user command in the main text area
+            self.display_message(f"You: {message}", color="black")
             running = self.client.execute_command(message)
             self.input_box.delete(0, tk.END)
             if not running:
@@ -327,14 +352,12 @@ class ClientGUI:
             while True:
                 if self.client.clientSocket:
                     time.sleep(1)
-                    # Call your existing receive_message function here
                     response = self.client.receive_response()
-                    formattedResponse = self.client.format_response(response)
-                    # response = "Server: Example response"  # Placeholder for server message
-                    #Response may contain multiple
-                    if formattedResponse is not None:
-                        for resp in formattedResponse:
-                            self.display_message(resp)
+                    formatted_responses = self.client.format_response(response)
+                    if formatted_responses:
+                        for resp in formatted_responses:
+                            # Display server responses in the server messages text area
+                            self.display_server_message(resp, color="green")
         
         threading.Thread(target=receive_loop, daemon=True).start()
 
@@ -343,6 +366,8 @@ class ClientGUI:
         self.client.close()
         print("Closing the GUI")
         self.root.destroy()
+
+
 
 if __name__ == "__main__":
     root = tk.Tk()
