@@ -1,0 +1,30 @@
+join joe
+join bob
+join tom
+join rob
+
+post ExampleSubject This is the Message
+
+leave
+leave
+leave
+
+groupjoin 1
+
+groupjoin 2
+
+groupjoin 2
+
+post ExampleSubject This is the Message
+
+groupjoin 3
+
+grouppost PrivateSubject This is the private subject
+
+groupleave 1
+groupleave 2
+groupleave 2
+groupleave 3
+
+
+
