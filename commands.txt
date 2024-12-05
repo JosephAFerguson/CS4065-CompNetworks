@@ -1,30 +1,60 @@
+Part 1:
+
+Client 1:
+connect
 join joe
+
+Client 2:
+connect
 join bob
+
+Client 3:
+connect
 join tom
-join rob
 
+Client 1:
 post ExampleSubject This is the Message
-
-leave
-leave
 leave
 
+Client 2:
+leave
+
+Client 3:
+leave
+
+Part 2:
+
+Client 1:
+join joe
 groupjoin 1
 
+Client 2:
+join bob
 groupjoin 2
 
+Client 3:
+join tom
 groupjoin 2
 
+Client 1:
 post ExampleSubject This is the Message
 
+Client 2:
+post ExampleSubject2 This is the Message2
+
+Client 2:
 groupjoin 3
+grouppost 3 PrivateSubject This is the private subject
 
-grouppost PrivateSubject This is the private subject
-
+Client 1:
 groupleave 1
-groupleave 2
+
+Client 2:
 groupleave 2
 groupleave 3
+
+Client 3:
+groupleave 2
 
 
 
